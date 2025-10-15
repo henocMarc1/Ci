@@ -1,0 +1,25 @@
+{
+  "name": "SIMMO 2.0 GESTION HA",
+  "short_name": "SIMMO 2.0",
+  "description": "Application de gestion de tontines immobilières",
+  "start_url": "SIMMO 2.0 GESTION.HTML",
+  "display": "standalone",
+  "background_color": "#2C3E50",
+  "theme_color": "#2C3E50",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "logo-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "finance", "productivity"]
+}

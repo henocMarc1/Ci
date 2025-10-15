@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Connexion / Inscription — SIMMO</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .auth-wrapper {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: var(--bg, #f7f9fc);
+    }
+    .auth-card {
+      width: 100%;
+      max-width: 920px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      background: var(--card-bg, #fff);
+      border-radius: 12px;
+      box-shadow: 0 6px 24px rgba(20,30,50,0.08);
+      overflow: hidden;
+    }
+    .auth-panel {
+      padding: 28px;
+    }
+    .brand {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      margin-bottom:16px;
+    }
+    .brand h1 { font-size:20px; margin:0; }
+    .divider {
+      display:flex; align-items:center; justify-content:center;
+      font-size:13px; color:#888; padding:12px 0;
+    }
+    .hidden { display:none !important; }
+    .msg { color: #b00020; margin-top:8px; min-height:20px; }
+    @media (max-width:900px) {
+      .auth-card { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="auth-wrapper">
+    <section class="auth-card" role="main" aria-labelledby="auth-title">
+      <!-- Left : illustration / message -->
+      <div class="auth-panel" style="background:linear-gradient(180deg,#075985 0%, #0284c7 100%); color:white;">
+        <div class="brand">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect width="24" height="24" rx="6" fill="white" opacity="0.08"/>
+            <path d="M6 12h12" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+            <path d="M8 8v8" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+          <div>
+            <h1 id="auth-title">SIMMO</h1>
+            <div style="opacity:.9; font-size:13px;">Gestion des membres & paiements</div>
+          </div>
+        </div>
+
+        <h2 style="margin-top:18px; margin-bottom:8px;">Bienvenue</h2>
+        <p style="opacity:.95; line-height:1.5;">
+          Connecte-toi pour accéder à tes données. Si tu n'as pas de compte, utilise le formulaire d'inscription.
+          Tes données sont synchronisées et disponibles depuis tous tes appareils.
+        </p>
+
+        <div class="divider" style="margin-top:18px;">Sécurisé par Firebase</div>
+
+        <p style="font-size:13px; opacity:.9; margin-top:10px;">
+          Besoin d'aide ? contacte l'administrateur.
+        </p>
+      </div>
+
+      <!-- Right : forms -->
+      <div class="auth-panel" style="display:flex; flex-direction:column; justify-content:center;">
+        <!-- Toggles -->
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <button id="btnShowLogin" class="btn">Connexion</button>
+          <button id="btnShowSignup" class="btn btn-outline">Inscription</button>
+        </div>
+
+        <!-- Connexion -->
+        <form id="loginForm" class="auth-form" aria-label="Formulaire de connexion">
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="ton.email@exemple.com" required />
+
+          <label for="password">Mot de passe</label>
+          <input id="password" type="password" placeholder="••••••••" minlength="6" required />
+
+          <button type="submit" class="btn btn-primary" style="margin-top:12px;">Se connecter</button>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+            <a href="#" id="forgotPasswordLink" style="font-size:13px;">Mot de passe oublié ?</a>
+            <span id="loginLoader" class="hidden">⏳</span>
+          </div>
+
+          <div id="loginMsg" class="msg" role="status" aria-live="polite"></div>
+        </form>
+
+        <!-- Inscription -->
+        <form id="signupForm" class="auth-form hidden" aria-label="Formulaire d'inscription">
+          <label for="displayName">Nom complet</label>
+          <input id="displayName" type="text" placeholder="Ton nom complet" />
+
+          <label for="suEmail">Email</label>
+          <input id="suEmail" type="email" placeholder="ton.email@exemple.com" required />
+
+          <label for="suPassword">Mot de passe</label>
+          <input id="suPassword" type="password" placeholder="Au moins 6 caractères" minlength="6" required />
+
+          <button type="submit" class="btn btn-primary" style="margin-top:12px;">S'inscrire</button>
+
+          <div id="signupMsg" class="msg" role="status" aria-live="polite"></div>
+        </form>
+
+        <!-- Option import/export or info -->
+        <div style="margin-top:14px; font-size:13px; color:#555;">
+          <em>Astuce :</em> utilise le même compte pour retrouver tes données sur un autre appareil.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Firebase Compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAn8qN6WNhQSByxJjppGNZXZ5B7_sG-MV4",
+      authDomain: "simmo-21084.firebaseapp.com",
+      databaseURL: "https://simmo-21084-default-rtdb.firebaseio.com",
+      projectId: "simmo-21084",
+      storageBucket: "simmo-21084.firebasestorage.app",
+      messagingSenderId: "260886429597",
+      appId: "1:260886429597:web:aeeb11ec2ad4715cf7b974",
+      measurementId: "G-SBENTVR4SZ"
+    };
+
+    // Initialiser Firebase seulement si pas déjà fait
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    // Elements
+    const btnShowLogin = document.getElementById('btnShowLogin');
+    const btnShowSignup = document.getElementById('btnShowSignup');
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    const loginMsg = document.getElementById('loginMsg');
+    const signupMsg = document.getElementById('signupMsg');
+    const loginLoader = document.getElementById('loginLoader');
+    const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+
+    function showLogin() {
+      loginForm.classList.remove('hidden');
+      signupForm.classList.add('hidden');
+      loginMsg.textContent = '';
+      signupMsg.textContent = '';
+    }
+    
+    function showSignup() {
+      signupForm.classList.remove('hidden');
+      loginForm.classList.add('hidden');
+      loginMsg.textContent = '';
+      signupMsg.textContent = '';
+    }
+
+    // toggle handlers
+    btnShowLogin.addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
+    btnShowSignup.addEventListener('click', (e) => { e.preventDefault(); showSignup(); });
+
+    // Redirect if already logged in (with flag to prevent loop)
+    auth.onAuthStateChanged((user) => {
+      if (user && !sessionStorage.getItem('redirecting')) {
+        sessionStorage.setItem('redirecting', 'true');
+        window.location.replace('index.html');
+      }
+    });
+
+    // Sign-in
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      loginMsg.textContent = '';
+      loginLoader.classList.remove('hidden');
+      
+      try {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        
+        if (!email || !password) {
+          throw new Error('Email et mot de passe requis.');
+        }
+        
+        await auth.signInWithEmailAndPassword(email, password);
+        sessionStorage.setItem('redirecting', 'true');
+        window.location.replace('index.html');
+      } catch (err) {
+        loginMsg.textContent = 'Erreur : ' + (err.message || err);
+      } finally {
+        loginLoader.classList.add('hidden');
+      }
+    });
+
+    // Sign-up
+    signupForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      signupMsg.textContent = '';
+      
+      try {
+        const email = document.getElementById('suEmail').value.trim();
+        const password = document.getElementById('suPassword').value;
+        const displayName = document.getElementById('displayName').value.trim();
+        
+        if (!email || !password) {
+          throw new Error('Email et mot de passe requis.');
+        }
+        
+        if (password.length < 6) {
+          throw new Error('Le mot de passe doit contenir au moins 6 caractères.');
+        }
+        
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        const uid = cred.user.uid;
+        
+        // Ajouter displayName si fourni
+        if (displayName) {
+          await cred.user.updateProfile({ displayName });
+        }
+        
+        // Créer profil initial dans la Realtime DB
+        await db.ref(`users/${uid}/profile`).set({
+          email,
+          displayName: displayName || '',
+          createdAt: Date.now()
+        });
+        
+        // Initialiser données applicatives
+        await db.ref(`users/${uid}/appData`).set({
+          members: [],
+          lots: [],
+          payments: []
+        });
+        
+        // onAuthStateChanged redirigera vers index.html
+      } catch (err) {
+        signupMsg.textContent = 'Erreur : ' + (err.message || err);
+      }
+    });
+
+    // Mot de passe oublié
+    forgotPasswordLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      
+      if (!email) {
+        loginMsg.textContent = 'Entrez votre email puis cliquez sur "Mot de passe oublié".';
+        return;
+      }
+      
+      loginMsg.textContent = 'Envoi du lien...';
+      
+      try {
+        await auth.sendPasswordResetEmail(email);
+        loginMsg.textContent = 'Lien de réinitialisation envoyé à ' + email;
+      } catch (err) {
+        loginMsg.textContent = 'Erreur : ' + (err.message || err);
+      }
+    });
+
+    // Affiche la section par défaut
+    showLogin();
+  </script>
+</body>
+</html>

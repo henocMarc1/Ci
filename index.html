@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+      <link rel="manifest" href="manifest.json">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIMMO 2.0 </title>
+    <link rel="shortcut icon" href="logo.ico" type="image/x-icon" sizes="16x16" border-radius: "20px">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Firebase Compat -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<link rel="stylesheet" href="styles.mobile.css">
+<!-- NOUVELLE LIGNE À AJOUTER -->
+<link rel="stylesheet" href="mobile-glass-nav.css">
+<!-- Configuration Firebase -->
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyAn8qN6WNhQSByxJjppGNZXZ5B7_sG-MV4",
+    authDomain: "simmo-21084.firebaseapp.com",
+    databaseURL: "https://simmo-21084-default-rtdb.firebaseio.com",
+    projectId: "simmo-21084",
+    storageBucket: "simmo-21084.firebasestorage.app",
+    messagingSenderId: "260886429597",
+    appId: "1:260886429597:web:aeeb11ec2ad4715cf7b974",
+    measurementId: "G-SBENTVR4SZ"
+};
+firebase.initializeApp(firebaseConfig);
+console.log('Firebase initialisé!');
+
+firebase.auth().onAuthStateChanged(function(user) {
+  sessionStorage.removeItem('redirecting');
+  if (!user) {
+    window.location.replace('login.html');
+  } else {
+    window.currentUser = user;
+    console.log('Utilisateur connecté:', user.email);
+    
+    function initApp() {
+      const userNameEl = document.getElementById('userName');
+      const userAvatarEl = document.getElementById('userAvatar');
+      if (userNameEl && user.displayName) {
+        userNameEl.textContent = user.displayName;
+      } else if (userNameEl) {
+        userNameEl.textContent = user.email;
+      }
+      if (userAvatarEl && user.displayName) {
+        const initials = user.displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        userAvatarEl.textContent = initials;
+      } else if (userAvatarEl && user.email) {
+        userAvatarEl.textContent = user.email.substring(0, 2).toUpperCase();
+      }
+      
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', function() {
+          firebase.auth().signOut().then(function() {
+            window.location.replace('login.html');
+          }).catch(function(error) {
+            console.error('Erreur de déconnexion:', error);
+          });
+        });
+      }
+      
+      if (typeof PaymentManager !== 'undefined' && !window.paymentManager) {
+        window.paymentManager = new PaymentManager();
+      }
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+      initApp();
+    }
+  }
+});
+</script>
+
+<!-- Script principal (SANS type="module") -->
+<script src="./script.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<link rel="stylesheet" href="styles.mobile.css"> 
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+</head>
+<body>
+    <div class="app-container">
+<header class="header">
+    <div class="header-content">
+        <div class="header-left">
+            <!-- >> INSÉRER juste après la div.logo dans .header-content -->
+<button id="mobileMenuBtn" class="mobile-menu" aria-label="Ouvrir le menu">
+  <span class="mobile-menu-icon">☰</span>
+</button>
+
+            <div class="logo">
+    <img src="logo.jpeg" style="height: 40px; width: 40px; border-radius: 50%;" />  
+                <span class="logo-text">SIMMO 2.0 GESTION</span>
+            </div>
+        </div>
+        
+        <nav class="header-nav">
+            <button class="nav-tab active" data-tab="dashboard">
+    <img src="gauge-high-solid-full.svg" style="height: 25px; width: 40px; border-radius: 50%;" />  
+                Tableau de bord
+            </button>
+            <button class="nav-tab" data-tab="members">
+                <i class="fas fa-users"></i>
+                Membres
+            </button>
+            <button class="nav-tab" data-tab="lots">
+                <i class="fas fa-home"></i>
+                Lots
+            </button>
+            <button class="nav-tab" data-tab="payments">
+                <i class="fas fa-credit-card"></i>
+                Gestion des Paiements
+            </button>
+            <button class="nav-tab" data-tab="statistics">
+                <i class="fas fa-chart-line"></i>
+                Statistiques
+            </button>
+        </nav>
+        
+        <div class="header-right">
+            <div class="user-profile">
+                <div class="user-avatar" id="userAvatar">U</div>
+                <i class="fa-solid fa-user"></i>
+                <span class="user-name" id="userName">Utilisateur</span>
+            </div>
+            <button class="btn btn-secondary" id="logoutBtn" style="margin-left: 12px;">
+                <i class="fas fa-sign-out-alt"></i> Déconnexion
+            </button>
+        </div>
+    </div>
+</header>
+
+        <main class="main-content">
+<div class="tab-content active" id="dashboard">
+    <div class="dashboard-hero">
+        <div class="hero-content">
+            <h2 class="hero-title"><i class="fas fa-chart-bar"></i> Tableau de Bord</h2>
+            <p class="hero-subtitle">Vue d'ensemble de vos activités de tontines</p>
+        </div>
+        <div class="hero-stats">
+            <div class="hero-stat-card">
+                <div class="stat-icon"><i class="fas fa-users"></i></div>
+                <div class="stat-info">
+                    <span class="stat-number" id="totalMembers">0</span>
+                    <span class="stat-text">Membres Actifs</span>
+                </div>
+            </div>
+            <div class="hero-stat-card">
+                <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                <div class="stat-info">
+                    <span class="stat-number" id="totalPayments">0 FCFA</span>
+                    <span class="stat-text">Ce Mois</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Résumé Mensuel  -->
+        <div class="card premium-card full-width">
+            <div class="card-header">
+                <div class="header-left">
+                    <div class="card-icon"><i class="fas fa-chart-pie"></i></div>
+                    <h3 class="card-title">Résumé Mensuel</h3>
+                </div>
+                <div class="month-selector">
+                    <button class="month-nav" id="prevMonth">❮</button>
+                    <span id="currentMonth" class="current-month">Janvier 2025</span>
+                    <button class="month-nav" id="nextMonth">❯</button>
+                </div>
+            </div>
+            <div class="card-content">
+                <div class="summary-grid">
+                    <div class="summary-card success">
+                        <div class="summary-icon"><i class="fas fa-wallet"></i></div>
+                        <div class="summary-info">
+                            <div class="summary-label">Total Collecté</div>
+                            <div class="summary-value" id="monthlyCollected">0 FCFA</div>
+                        </div>
+                    </div>
+                    <div class="summary-card primary">
+                        <div class="summary-icon"><i class="fas fa-bullseye"></i></div>
+                        <div class="summary-info">
+                            <div class="summary-label">Objectif</div>
+                            <div class="summary-value" id="monthlyExpected">0 FCFA</div>
+                        </div>
+                    </div>
+                    <div class="summary-card info">
+                        <div class="summary-icon"><i class="fas fa-percentage"></i></div>
+                        <div class="summary-info">
+                            <div class="summary-label">Progression</div>
+                            <div class="summary-value" id="completionRate">0%</div>
+                        </div>
+                    </div>
+                    <div class="summary-card warning">
+                        <div class="summary-icon"><i class="fas fa-home"></i></div>
+                        <div class="summary-info">
+                            <div class="summary-label">Valeur Lots</div>
+                            <div class="summary-value" id="totalLotsValue">0 FCFA</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-header">
+                        <span>Progression du mois</span>
+                        <span id="progressPercentage">0%</span>
+                    </div>
+                    <div class="progress-bar-modern">
+                        <div class="progress-fill-modern" id="monthlyProgress"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paiements Récents -->
+        <div class="card full-width recent-card">
+            <div class="card-header">
+                <div class="header-left">
+                    <div class="card-icon"><i class="fas fa-receipt"></i></div>
+                    <h3 class="card-title">Paiements Récents</h3>
+                </div>
+                <button class="btn btn-link" id="viewAllPayments">Voir Tout →</button>
+            </div>
+            <div class="card-content">
+                <div class="recent-payments-modern" id="recentPayments">
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions Récentes  -->
+        <div class="card full-width actions-card">
+            <div class="card-header">
+                <div class="header-left">
+                    <div class="card-icon"><i class="fas fa-history"></i></div>
+                    <h3 class="card-title">Activités Récentes</h3>
+                </div>
+                <button class="btn btn-secondary btn-small" id="exportPDF"><i class="fas fa-file-pdf"></i> Export</button>
+            </div>
+            <div class="card-content">
+                <!-- Stats horizontales -->
+                <div class="activity-stats-horizontal">
+                    <div class="activity-stat-item success">
+                        <div class="activity-stat-icon"><i class="fas fa-check-circle"></i></div>
+                        <div class="activity-stat-info">
+                            <div class="activity-stat-number" id="paidMembers">0</div>
+                            <div class="activity-stat-label">Membres Payés</div>
+                        </div>
+                    </div>
+                    <div class="activity-stat-item warning">
+                        <div class="activity-stat-icon"><i class="fas fa-clock"></i></div>
+                        <div class="activity-stat-info">
+                            <div class="activity-stat-number" id="pendingMembers">0</div>
+                            <div class="activity-stat-label">En Attente</div>
+                        </div>
+                    </div>
+                    <div class="activity-stat-item info">
+                        <div class="activity-stat-icon"><i class="fas fa-percentage"></i></div>
+                        <div class="activity-stat-info">
+                            <div class="activity-stat-number" id="progressPercentage2">0%</div>
+                            <div class="activity-stat-label">Taux de Paiement</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Actions récentes -->
+                <div class="recent-actions-modern" id="recentActions">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal des détails du lot -->
+<div class="modal-overlay" id="lotDetailsModal">
+    <div class="modal-container large">
+        <div class="modal-header">
+            <h3 class="" id="lotDetailsTitle">
+                <i class="fas fa-info-circle"></i> Détails du Lot
+            </h3>
+            <button class="modal-close" id="lotDetailsClose">&times;</button>
+        </div>
+<div class="member-lot">
+    <i class="fas fa-home"></i>
+</div>
+        <!-- Onglets du modal -->
+        <div class="modal-tabs">
+            <button class="modal-tab active" data-lot-tab="info">
+                <i class="fas fa-info-circle"></i> Informations
+            </button>
+            <button class="modal-tab" data-lot-tab="members">
+                <i class="fas fa-users"></i> Membres (<span id="lotMembersCount">0</span>)
+            </button>
+        </div>
+        
+        <div class="modal-content">
+            <!-- Onglet Informations -->
+            <div class="lot-tab-content active" id="lotTabInfo">
+                <div class="lot-details-grid">
+                    <div class="lot-detail-item">
+                        <div class="lot-detail-label">Nom du Lot</div>
+                        <div class="lot-detail-value" id="lotDetailName">-</div>
+                    </div>
+                    <div class="lot-detail-item">
+                        <div class="lot-detail-label">Prix</div>
+                        <div class="lot-detail-value" id="lotDetailPrice">-</div>
+                    </div>
+                    <div class="lot-detail-item">
+                        <div class="lot-detail-label">Localisation</div>
+                        <div class="lot-detail-value" id="lotDetailLocation">-</div>
+                    </div>
+                    <div class="lot-detail-item">
+                        <div class="lot-detail-label">Statut</div>
+                        <div class="lot-detail-value" id="lotDetailStatus">-</div>
+                    </div>
+                    <div class="lot-detail-item full-width">
+                        <div class="lot-detail-label">Description</div>
+                        <div class="lot-detail-value" id="lotDetailDescription">-</div>
+                    </div>
+                    <div class="lot-detail-item">
+                        <div class="lot-detail-label">Date de Création</div>
+                        <div class="lot-detail-value" id="lotDetailCreated">-</div>
+                    </div>
+                    <div class="lot-detail-item">
+                        <div class="lot-detail-label">Membres Inscrits</div>
+                        <div class="lot-detail-value" id="lotDetailMembersTotal">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Onglet Membres -->
+            <div class="lot-tab-content" id="lotTabMembers">
+                <div class="lot-members-list" id="lotMembersList">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+            <div class="tab-content" id="members">
+                <div class="tab-header">
+                    <h2 class="tab-title">Membres</h2>
+                    <button class="btn btn-primary" id="addMemberBtn">Ajouter Membre</button>
+                </div>
+                
+                <div class="search-container">
+                    <div class="search-input-container">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" id="memberSearch" class="search-input" placeholder="Rechercher des membres...">
+                    </div>
+                    <div class="filter-container">
+                        <select id="memberStatusFilter" class="filter-select">
+                            <option value="">Tous les statuts</option>
+                            <option value="paid">Payé</option>
+                            <option value="pending">En attente</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="members-grid" id="membersGrid">
+                </div>
+            </div>
+
+            <div class="tab-content" id="payments">
+                <div class="tab-header">
+                    <h2 class="tab-title">Paiements</h2>
+                    <button class="btn btn-primary" id="addPaymentBtn"></button>
+                </div>
+                
+                <div class="filters-container">
+                    <div class="filter-group">
+                        <select id="monthFilter" class="filter-select">
+                            <option value="">Tous les Mois</option>
+                        </select>
+                        <select id="memberFilter" class="filter-select">
+                            <option value="">Tous les Membres</option>
+                        </select>
+                        <button class="btn btn-secondary" id="exportPaymentsPDF">Export PDF</button>
+                    </div>
+                    <div class="search-input-container">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" id="paymentSearch" class="search-input" placeholder="Rechercher des paiements...">
+                    </div>
+                </div>
+
+                <div class="payments-list" id="paymentsList">
+                </div>
+            </div>
+
+            <div class="tab-content" id="lots">
+                <div class="tab-header">
+                    <h2 class="tab-title">Lots Immobiliers</h2>
+                    <button class="btn btn-primary" id="addLotBtn">Ajouter Lot</button>
+                </div>
+                
+                <div class="search-container">
+                    <div class="search-input-container">
+                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input type="text" id="lotSearch" class="search-input" placeholder="Rechercher des lots...">
+                    </div>
+                </div>
+
+                <div class="lots-grid" id="lotsGrid">
+                </div>
+            </div>
+
+            <div class="tab-content" id="statistics">
+                <div class="tab-header">
+                    <h2 class="tab-title">Statistiques</h2>
+                    <div class="stats-controls">
+                        <select id="statsYearFilter" class="filter-select">
+                            <option value="">Année</option>
+                        </select>
+<button id="exportStatsBtn" class="btn btn-primary">Exporter</button>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stats-overview">
+                        <div class="stat-card primary">
+                            <div class="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="totalMembersStats">0</div>
+                                <div class="stat-label">Total Membres</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card secondary">
+                            <div class="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                    <line x1="1" y1="10" x2="23" y2="10"></line>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="totalPaymentsStats">0 FCFA</div>
+                                <div class="stat-label">Total Paiements</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card accent">
+                            <div class="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                    <polyline points="9,22 9,12 15,12 15,22"></polyline>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="totalLotsStats">0</div>
+                                <div class="stat-label">Lots Disponibles</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card success">
+                            <div class="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="completionRateStats">0%</div>
+                                <div class="stat-label">Taux de Completion</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Évolution Mensuelle</h3>
+                            <div class="chart-legend">
+                                <div class="legend-item">
+                                    <div class="legend-color primary"></div>
+                                    <span>Paiements</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color secondary"></div>
+                                    <span>Nouveaux Membres</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chart-content" id="monthlyChart">
+                        </div>
+                    </div>
+
+                    <div class="performance-table">
+                        <div class="table-header">
+                            <h3 class="table-title">Performance Mensuelle</h3>
+                        </div>
+                        <div class="table-content">
+                            <table class="stats-table">
+                                <thead>
+                                    <tr>
+                                        <th>Mois</th>
+                                        <th>Paiements</th>
+                                        <th>Montant</th>
+                                        <th>Nouveaux Membres</th>
+                                        <th>Taux de Completion</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="performanceTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle"></h3>
+                <button class="modal-close" id="modalClose">×</button>
+            </div>
+            <div class="modal-content" id="modalContent">
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer">
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js', { scope: './' })
+    .then(reg => {
+      console.log('Service worker enregistré.');
+    })
+    .catch(err => {
+      console.error('Échec enregistrement SW :', err);
+    });
+}
+</script>
+<script>
+let deferredPrompt;
+const installButton = document.getElementById('installButton');
+
+installButton.style.display = 'none';
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  
+  installButton.style.display = 'block';
+  
+  installButton.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      console.log('Application installée');
+      installButton.style.display = 'none';
+    }
+    
+    deferredPrompt = null;
+  });
+});
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(registration => {
+        console.log('Service Worker enregistré avec succès:', registration);
+      })
+      .catch(error => {
+        console.log('Échec de l\'enregistrement du Service Worker:', error);
+      });
+  });
+}
+
+window.addEventListener('load', () => {
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    console.log('Lancement en mode application');
+    document.body.classList.add('standalone');
+  }
+});
+</script>
+<!-- Navigation mobile en bas (Style iOS) -->
+<nav class="bottom-nav">
+    <div class="bottom-nav-container">
+        <button class="bottom-nav-btn active" data-tab="dashboard">
+            <i class="fas fa-chart-pie"></i>
+            <span>Tableau</span>
+        </button>
+        
+        <button class="bottom-nav-btn" data-tab="members">
+            <i class="fas fa-users"></i>
+            <span>Membres</span>
+        </button>
+        
+        <button class="bottom-nav-btn" data-tab="lots">
+            <i class="fas fa-home"></i>
+            <span>Lots</span>
+        </button>
+        
+        <button class="bottom-nav-btn" data-tab="payments">
+            <i class="fas fa-credit-card"></i>
+            <span>Paiements</span>
+        </button>
+        
+        <button class="bottom-nav-btn" data-tab="statistics">
+            <i class="fas fa-chart-line"></i>
+            <span>Stats</span>
+        </button>
+    </div>
+</nav>
+
+<!-- Script de synchronisation -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const bottomBtns = document.querySelectorAll('.bottom-nav-btn');
+    const desktopBtns = document.querySelectorAll('.header-nav .nav-tab');
+    
+    function setActive(tabName) {
+        bottomBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tabName));
+        desktopBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tabName));
+    }
+    
+    bottomBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tab = this.dataset.tab;
+            const desktop = document.querySelector(`.header-nav .nav-tab[data-tab="${tab}"]`);
+            if (desktop) desktop.click();
+            setActive(tab);
+        });
+    });
+    
+    desktopBtns.forEach(btn => {
+        btn.addEventListener('click', () => setActive(btn.dataset.tab));
+    });
+});
+</script>
+
+</body>
+</html>

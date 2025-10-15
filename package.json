@@ -1,0 +1,19 @@
+{
+  "name": "simmo-gestion",
+  "version": "1.0.0",
+  "description": "Application SIMMO 2.0 GESTION HA",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "package-win": "electron-packager . SIMMO_GESTION --platform=win32 --arch=x64 --icon=logo.ico --out=dist --overwrite"
+  },
+  "author": "Henoc Assoua (+225 05 45 47 79 23)",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-packager": "^17.0.0"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
