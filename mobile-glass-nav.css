@@ -1,4 +1,4 @@
-/* Navigation mobile fixe avec effet glass */
+/* Navigation mobile fixe avec effet glass - TOUJOURS VISIBLE */
 @media (max-width: 768px) {
     /* Masquer menu desktop */
     .mobile-menu { 
@@ -28,18 +28,18 @@
         z-index: 99999 !important;
         
         /* Effet glassmorphism iOS */
-        background: rgba(255, 255, 255, 0.72) !important;
-        backdrop-filter: blur(40px) saturate(180%) !important;
-        -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+        background: rgba(255, 255, 255, 0.85) !important;
+        backdrop-filter: blur(20px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
         
-        border-top: 0.5px solid rgba(0, 0, 0, 0.04) !important;
+        border-top: 0.5px solid rgba(0, 0, 0, 0.08) !important;
         box-shadow: 
-            0 -2px 16px rgba(0, 0, 0, 0.04),
-            0 -1px 2px rgba(0, 0, 0, 0.02),
-            inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+            0 -2px 16px rgba(0, 0, 0, 0.08),
+            0 -1px 4px rgba(0, 0, 0, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
         
         padding: 8px 0 !important;
-        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+        padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)) !important;
         
         display: flex !important;
         visibility: visible !important;
@@ -47,6 +47,22 @@
         transform: translateY(0) !important;
         transition: none !important;
         pointer-events: all !important;
+        
+        /* IMPORTANT: Empêcher tout comportement de scroll */
+        will-change: transform;
+        -webkit-transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 0, 0);
+    }
+    
+    /* S'assurer que rien ne peut cacher la navigation */
+    .bottom-nav::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: -1;
     }
     
     /* Container */
@@ -55,12 +71,13 @@
         justify-content: space-around !important;
         align-items: center !important;
         width: 100% !important;
-        max-width: 500px !important;
+        max-width: 100% !important;
         padding: 0 16px !important;
         margin: 0 auto !important;
     }
     
-    /* Boutons */
+    /* Boutons de navigation */
+    .bottom-nav .nav-tab,
     .bottom-nav-btn {
         display: flex !important;
         flex-direction: column !important;
@@ -70,62 +87,72 @@
         padding: 6px 12px !important;
         background: transparent !important;
         border: none !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         flex: 1 !important;
         max-width: 80px !important;
         min-height: 56px !important;
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
         cursor: pointer !important;
         -webkit-tap-highlight-color: transparent !important;
         position: relative !important;
+        color: #6c757d !important;
+        text-decoration: none !important;
     }
     
     /* Icônes */
+    .bottom-nav .nav-tab i,
     .bottom-nav-btn i,
+    .bottom-nav .nav-tab img,
     .bottom-nav-btn img {
         font-size: 24px !important;
         width: 24px !important;
         height: 24px !important;
         color: #8E8E93 !important;
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
     
     /* Texte */
+    .bottom-nav .nav-tab span,
     .bottom-nav-btn span {
         font-size: 10px !important;
         font-weight: 500 !important;
         color: #8E8E93 !important;
         text-align: center !important;
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
         white-space: nowrap !important;
         letter-spacing: -0.2px !important;
     }
     
-    /* État actif - Style iOS */
+    /* État actif - Style moderne */
+    .bottom-nav .nav-tab.active,
     .bottom-nav-btn.active {
-        background: rgba(0, 122, 255, 0.12) !important;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.12)) !important;
     }
     
+    .bottom-nav .nav-tab.active i,
     .bottom-nav-btn.active i,
+    .bottom-nav .nav-tab.active img,
     .bottom-nav-btn.active img {
-        color: #007AFF !important;
-        transform: scale(1.08) translateY(-1px) !important;
+        color: #6366F1 !important;
+        transform: scale(1.1) translateY(-1px) !important;
     }
     
+    .bottom-nav .nav-tab.active span,
     .bottom-nav-btn.active span {
-        color: #007AFF !important;
+        color: #6366F1 !important;
         font-weight: 600 !important;
     }
     
-    /* Touch feedback iOS style */
+    /* Touch feedback */
+    .bottom-nav .nav-tab:active,
     .bottom-nav-btn:active {
-        transform: scale(0.96) !important;
-        background: rgba(0, 122, 255, 0.08) !important;
+        transform: scale(0.95) !important;
+        background: rgba(99, 102, 241, 0.08) !important;
         transition: all 0.1s ease !important;
     }
     
     /* Animation au chargement */
-    @keyframes slideUp {
+    @keyframes slideUpNav {
         from {
             transform: translateY(100%);
             opacity: 0;
@@ -137,12 +164,61 @@
     }
     
     .bottom-nav {
-        animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        animation: slideUpNav 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    
+    /* S'assurer que le contenu ne passe pas sous la nav */
+    .main-content {
+        padding-bottom: calc(90px + 20px) !important;
+    }
+    
+    /* Header mobile fixe aussi */
+    .header {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 9999 !important;
+    }
+    
+    /* Ajuster le contenu principal pour le header fixe */
+    .main-content {
+        margin-top: 60px !important;
     }
 }
 
+/* Cache la navigation sur desktop */
 @media (min-width: 769px) {
     .bottom-nav { 
         display: none !important; 
+    }
+    
+    .mobile-menu {
+        display: none !important;
+    }
+}
+
+/* Très petits écrans */
+@media (max-width: 420px) {
+    .bottom-nav {
+        padding: 6px 0 !important;
+        padding-bottom: max(6px, env(safe-area-inset-bottom, 0px)) !important;
+    }
+    
+    .bottom-nav .nav-tab,
+    .bottom-nav-btn {
+        padding: 4px 8px !important;
+        min-height: 52px !important;
+        max-width: 70px !important;
+    }
+    
+    .bottom-nav .nav-tab span,
+    .bottom-nav-btn span {
+        font-size: 9px !important;
+    }
+    
+    .bottom-nav .nav-tab i,
+    .bottom-nav-btn i {
+        font-size: 22px !important;
     }
 }
