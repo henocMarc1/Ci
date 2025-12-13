@@ -3032,24 +3032,9 @@ async exportLotToPDF(lotId) {
 }
 
     showAddMemberModal() {
-        // Récupérer le prix d'un lot (tous les lots ont le même prix)
-        const lotPrice = this.getUnitPrice();
-
-        // Si aucun lot n'est créé, afficher un message utile et empêcher la création de membre
-        if (!this.lots || this.lots.length === 0) {
-            const contentNoLot = `
-                <div style="padding:20px; max-width:520px;">
-                    <p style="color:#b71c1c; font-weight:600; font-size:1.05em;">Aucun lot configuré</p>
-                    <p>Vous devez d'abord créer au moins un lot avec un prix unitaire avant d'ajouter des membres. Le principe du site repose sur un prix unitaire fixe.</p>
-                    <div style="text-align:right; margin-top:16px;">
-                        <button class="btn btn-secondary" onclick="app.closeModal()">Fermer</button>
-                        <button class="btn btn-primary" onclick="app.switchTab('lots'); app.closeModal();">Aller aux Lots</button>
-                    </div>
-                </div>
-            `;
-            this.showModal('Aucun Lot', contentNoLot);
-            return;
-        }
+        // Récupérer le prix d'un lot (tous les lots ont le même prix). Autoriser création même sans lots.
+        const fetchedPrice = this.getUnitPrice();
+        const lotPrice = (fetchedPrice == null) ? 1500000 : fetchedPrice;
 
         const content = `
             <form id="memberForm">
@@ -3072,7 +3057,7 @@ async exportLotToPDF(lotId) {
                 <div class="form-group">
                     <label class="form-label">Nombre de lots</label>
                     <input type="number" class="form-input" id="memberNumberOfLots" min="1" value="1" required>
-                    <small style="color: #666; margin-top: 5px; display: block;">Prix unitaire: ${this.formatCurrency(lotPrice)}</small>
+                    <small style="color: #666; margin-top: 5px; display: block;">Prix unitaire: ${this.formatCurrency(lotPrice)}${fetchedPrice == null ? ' (par défaut)' : ''}</small>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Durée de paiement (en mois)</label>
@@ -3861,10 +3846,7 @@ addMember(memberData) {
 }
 
     addMember() {
-        if (!this.lots || this.lots.length === 0) {
-            this.showToast("Impossible d'ajouter un membre : aucun lot n'est configuré.", 'error');
-            return;
-        }
+        // Allow adding members even if no lots exist; unit price will default to 0 if not configured
         const name = document.getElementById('memberName').value;
         const email = document.getElementById('memberEmail').value;
         const phone = document.getElementById('memberPhone').value;
@@ -3873,7 +3855,8 @@ addMember(memberData) {
         const paymentDuration = parseInt(document.getElementById('paymentDuration').value);
 
         // Récupérer le prix unitaire d'un lot
-        const lotPrice = this.getUnitPrice();
+        const fetchedPrice = this.getUnitPrice();
+        const lotPrice = (fetchedPrice == null) ? 1500000 : fetchedPrice;
         const totalPrice = numberOfLots * lotPrice;
         const monthlyQuota = paymentDuration > 0 ? Math.round((totalPrice / paymentDuration) / 100) * 100 : 0;
 
