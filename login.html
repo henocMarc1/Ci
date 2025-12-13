@@ -601,19 +601,30 @@
       signupMsg.classList.remove('show');
     }
 
-    btnShowLogin.addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
-    btnShowSignup.addEventListener('click', (e) => { e.preventDefault(); showSignup(); });
+    if (btnShowLogin) btnShowLogin.addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
+    if (btnShowSignup) btnShowSignup.addEventListener('click', (e) => { e.preventDefault(); showSignup(); });
 
-    // Check auth state
-    auth.onAuthStateChanged((user) => {
-      if (user && !sessionStorage.getItem('redirecting')) {
-        sessionStorage.setItem('redirecting', 'true');
-        window.location.replace('index.html');
+    // Check auth state (guard for environments where web storage or auth may be unavailable)
+    if (auth && typeof auth.onAuthStateChanged === 'function') {
+      try {
+        auth.onAuthStateChanged((user) => {
+          try {
+            if (user && window.sessionStorage && !sessionStorage.getItem('redirecting')) {
+              sessionStorage.setItem('redirecting', 'true');
+              window.location.replace('index.html');
+            }
+          } catch (e) {
+            console.warn('sessionStorage not available or redirect prevented:', e);
+          }
+        });
+      } catch (e) {
+        console.warn('Auth state listener not available in this environment:', e);
       }
-    });
+    }
 
     // Login
-    loginForm.addEventListener('submit', async (e) => {
+    if (loginForm) {
+      loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       loginMsg.classList.remove('show');
       loginLoader.classList.add('show');
@@ -634,10 +645,14 @@
       } finally {
         loginLoader.classList.remove('show');
       }
-    });
+      });
+    } else {
+      console.warn('loginForm not found; skipping login handler attachment');
+    }
 
     // Signup
-    signupForm.addEventListener('submit', async (e) => {
+    if (signupForm) {
+      signupForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       signupMsg.classList.remove('show');
       signupLoader.classList.add('show');
@@ -680,7 +695,10 @@
       } finally {
         signupLoader.classList.remove('show');
       }
-    });
+      });
+    } else {
+      console.warn('signupForm not found; skipping signup handler attachment');
+    }
 
     // 'Mot de passe oublié' supprimé — fonctionnalité volontairement retirée
   </script>
