@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
       <link rel="manifest" href="manifest.json">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SIMMO 2.0 </title>
+    <title>CI Habitat</title>
     <link rel="shortcut icon" href="logo.ico" type="image/x-icon" sizes="16x16" border-radius: "20px">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -83,8 +83,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 });
 </script>
 
-<!-- Script principal (SANS type="module") -->
-<script src="./script.js"></script>
+<!-- Scripts chargés à la fin du body pour éviter les erreurs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -105,7 +104,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 
             <div class="logo">
     <img src="logo.jpeg" style="height: 40px; width: 40px; border-radius: 50%;" />  
-                <span class="logo-text">SIMMO 2.0 GESTION</span>
+                <span class="logo-text">CI Habitat GESTION</span>
             </div>
         </div>
         
@@ -119,8 +118,8 @@ firebase.auth().onAuthStateChanged(function(user) {
                 Membres
             </button>
             <button class="nav-tab" data-tab="lots">
-                <i class="fas fa-home"></i>
-                Lots
+                <i class="fas fa-cog"></i>
+                Gestion des Lots
             </button>
             <button class="nav-tab" data-tab="payments">
                 <i class="fas fa-credit-card"></i>
@@ -130,9 +129,13 @@ firebase.auth().onAuthStateChanged(function(user) {
                 <i class="fas fa-chart-line"></i>
                 Statistiques
             </button>
+            <button class="nav-tab" data-tab="notifications">
+                <i class="fas fa-bell"></i>
+                Notifications
+            </button>
         </nav>
         
-        <div class="header-right">
+        <div class="header-right" style="display: flex; align-items: center; gap: 12px; z-index: 100;">
             <div class="user-profile">
                 <div class="user-avatar" id="userAvatar">U</div>
                 <i class="fa-solid fa-user"></i>
@@ -144,6 +147,30 @@ firebase.auth().onAuthStateChanged(function(user) {
         </div>
     </div>
 </header>
+
+        <!-- Bouton de notifications flottant -->
+        <div class="notifications-wrapper-fixed" style="position: fixed; bottom: 30px; right: 30px; z-index: 9999;">
+            <button class="notifications-btn-fixed" id="notificationsBtn" aria-label="Notifications" 
+                style="position: relative; background: linear-gradient(135deg, #6366F1, #8B5CF6); border: none; color: white; padding: 0; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 60px; height: 60px; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.6);">
+                <i class="fas fa-bell" style="font-size: 26px;"></i>
+                <span class="notifications-badge" id="notificationsBadge" 
+                    style="display: none; position: absolute; top: -5px; right: -5px; background: #dc3545; color: white; border-radius: 50%; min-width: 24px; height: 24px; font-size: 12px; font-weight: 700; align-items: center; justify-content: center; padding: 0 6px; border: 3px solid white; box-shadow: 0 2px 8px rgba(220, 53, 69, 0.5);">0</span>
+            </button>
+            
+            <!-- Dropdown des notifications -->
+            <div class="notifications-dropdown" id="notificationsDropdown">
+                <div class="notifications-header">
+                    <h3>Notifications</h3>
+                    <button class="mark-all-read" id="markAllRead">Tout marquer comme lu</button>
+                </div>
+                <div class="notifications-list" id="notificationsList">
+                    <!-- Les notifications seront injectées ici -->
+                </div>
+                <div class="notifications-footer">
+                    <button class="view-all-notifications" id="viewAllNotifications">Voir toutes les notifications</button>
+                </div>
+            </div>
+        </div>
 
         <main class="main-content">
 <div class="tab-content active" id="dashboard">
@@ -170,7 +197,48 @@ firebase.auth().onAuthStateChanged(function(user) {
         </div>
     </div>
 
+    <!-- Actions Rapides -->
+    <div class="quick-actions-bar">
+        <button class="quick-action-btn primary" id="quickAddPayment">
+            <i class="fas fa-plus-circle"></i>
+            <span>Enregistrer un Paiement</span>
+        </button>
+        <button class="quick-action-btn secondary" id="quickAddMember">
+            <i class="fas fa-user-plus"></i>
+            <span>Ajouter un Membre</span>
+        </button>
+        <button class="quick-action-btn accent" id="quickExportData">
+            <i class="fas fa-download"></i>
+            <span>Exporter les Données</span>
+        </button>
+        <button class="quick-action-btn info" id="toggleTheme">
+            <i class="fas fa-moon"></i>
+            <span>Mode Sombre</span>
+        </button>
+    </div>
+
+    <!-- Importation JSON Membres -->
+    <div class="import-json-bar" style="margin: 20px 0;">
+        <input type="file" id="jsonFileInput" accept=".json">
+        <button onclick="importerJSON()">Importer le fichier JSON</button>
+    </div>
+    <div id="resultat" style="margin-bottom: 20px;"></div>
+
     <div class="dashboard-grid">
+        <!-- Alertes et Notifications -->
+        <div class="card alert-card full-width" id="alertsCard" style="display: none;">
+            <div class="card-header">
+                <div class="header-left">
+                    <div class="card-icon alert-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    <h3 class="card-title">Alertes et Rappels</h3>
+                </div>
+                <button class="btn btn-link" id="dismissAlerts">Tout marquer lu</button>
+            </div>
+            <div class="card-content">
+                <div class="alerts-list" id="alertsList"></div>
+            </div>
+        </div>
+
         <!-- Résumé Mensuel  -->
         <div class="card premium-card full-width">
             <div class="card-header">
@@ -224,6 +292,45 @@ firebase.auth().onAuthStateChanged(function(user) {
                         <div class="progress-fill-modern" id="monthlyProgress"></div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Graphiques Statistiques -->
+        <div class="card full-width chart-card">
+            <div class="card-header">
+                <div class="header-left">
+                    <div class="card-icon"><i class="fas fa-chart-line"></i></div>
+                    <h3 class="card-title">Évolution des Paiements</h3>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <div style="display: flex; flex-direction: column;">
+                        <label style="font-size: 11px; color: #5D6D7E; margin-bottom: 3px;">Début</label>
+                        <input type="month" id="chartStartDate" class="filter-select" style="padding: 6px 10px; font-size: 13px;">
+                    </div>
+                    <div style="display: flex; flex-direction: column;">
+                        <label style="font-size: 11px; color: #5D6D7E; margin-bottom: 3px;">Fin</label>
+                        <input type="month" id="chartEndDate" class="filter-select" style="padding: 6px 10px; font-size: 13px;">
+                    </div>
+                    <button id="applyChartFilter" class="btn-secondary" style="margin-top: 18px; padding: 6px 15px; font-size: 13px;">
+                        <i class="fas fa-check"></i> Appliquer
+                    </button>
+                </div>
+            </div>
+            <div class="card-content">
+                <canvas id="paymentsChart" style="max-height: 300px;"></canvas>
+            </div>
+        </div>
+
+        <!-- Top Contributeurs -->
+        <div class="card full-width">
+            <div class="card-header">
+                <div class="header-left">
+                    <div class="card-icon"><i class="fas fa-trophy"></i></div>
+                    <h3 class="card-title">Top Contributeurs</h3>
+                </div>
+            </div>
+            <div class="card-content">
+                <div class="top-contributors-list" id="topContributorsList"></div>
             </div>
         </div>
 
@@ -310,6 +417,9 @@ firebase.auth().onAuthStateChanged(function(user) {
         <div class="modal-content">
             <!-- Onglet Informations -->
             <div class="lot-tab-content active" id="lotTabInfo">
+                <div class="lot-photos-gallery" id="lotPhotosGallery">
+                    <!-- Photos seront affichées ici -->
+                </div>
                 <div class="lot-details-grid">
                     <div class="lot-detail-item">
                         <div class="lot-detail-label">Nom du Lot</div>
@@ -353,7 +463,30 @@ firebase.auth().onAuthStateChanged(function(user) {
             <div class="tab-content" id="members">
                 <div class="tab-header">
                     <h2 class="tab-title">Membres</h2>
-                    <button class="btn btn-primary" id="addMemberBtn">Ajouter Membre</button>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div class="view-toggle">
+                            <button class="view-btn active" data-view="card" data-section="members" title="Vue en cartes">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="7" height="7"></rect>
+                                    <rect x="14" y="3" width="7" height="7"></rect>
+                                    <rect x="14" y="14" width="7" height="7"></rect>
+                                    <rect x="3" y="14" width="7" height="7"></rect>
+                                </svg>
+                            </button>
+                            <button class="view-btn" data-view="list" data-section="members" title="Vue en liste">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <button class="btn btn-secondary" id="toggleCondensedMembers">Mode condensé : OFF</button>
+                        <button class="btn btn-primary" id="addMemberBtn">Ajouter Membre</button>
+                    </div>
                 </div>
                 
                 <div class="search-container">
@@ -367,8 +500,23 @@ firebase.auth().onAuthStateChanged(function(user) {
                     <div class="filter-container">
                         <select id="memberStatusFilter" class="filter-select">
                             <option value="">Tous les statuts</option>
-                            <option value="paid">Payé</option>
-                            <option value="pending">En attente</option>
+                            <option value="solde">Soldé</option>
+                            <option value="non-solde">Non soldé</option>
+                        </select>
+                        <select id="memberUnpaidMonthsFilter" class="filter-select" style="margin-left: 10px;">
+                            <option value="">Tous les paiements</option>
+                            <option value="1">1 dernier mois impayé</option>
+                            <option value="2">2 derniers mois impayés</option>
+                            <option value="3">3 derniers mois impayés</option>
+                            <option value="4">4 derniers mois impayés</option>
+                            <option value="5">5 derniers mois impayés</option>
+                            <option value="6">6 derniers mois impayés</option>
+                            <option value="7">7 derniers mois impayés</option>
+                            <option value="8">8 derniers mois impayés</option>
+                            <option value="9">9 derniers mois impayés</option>
+                            <option value="10">10 derniers mois impayés</option>
+                            <option value="11">11 derniers mois impayés</option>
+                            <option value="12">12 derniers mois impayés</option>
                         </select>
                     </div>
                 </div>
@@ -408,21 +556,92 @@ firebase.auth().onAuthStateChanged(function(user) {
 
             <div class="tab-content" id="lots">
                 <div class="tab-header">
-                    <h2 class="tab-title">Lots Immobiliers</h2>
-                    <button class="btn btn-primary" id="addLotBtn">Ajouter Lot</button>
+                    <h2 class="tab-title">Gestion des Lots</h2>
                 </div>
                 
-                <div class="search-container">
-                    <div class="search-input-container">
-                        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <path d="m21 21-4.35-4.35"></path>
-                        </svg>
-                        <input type="text" id="lotSearch" class="search-input" placeholder="Rechercher des lots...">
+                <div class="lots-management-container">
+                    <!-- Prix du Lot -->
+                    <div class="lot-price-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-tag"></i> Prix Unitaire du Lot</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="price-display" id="lotPriceDisplay">
+                                <span class="price-label">Prix par lot :</span>
+                                <span class="price-value" id="currentLotPrice">0 FCFA</span>
+                            </div>
+                            <button class="btn btn-primary" id="editLotPriceBtn">
+                                <i class="fas fa-edit"></i> Modifier le Prix
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                <div class="lots-grid" id="lotsGrid">
+                    <!-- Statistiques -->
+                    <div class="lot-stats-grid">
+                        <div class="stat-card primary">
+                            <div class="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="totalClientsStats">0</div>
+                                <div class="stat-label">Clients Total</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card secondary">
+                            <div class="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                    <polyline points="9,22 9,12 15,12 15,22"></polyline>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="totalUnitsStats">0</div>
+                                <div class="stat-label">Lots Vendus</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card success">
+                            <div class="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="totalExpectedStats">0 FCFA</div>
+                                <div class="stat-label">Montant Attendu Total</div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card accent">
+                            <div class="stat-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                    <line x1="1" y1="10" x2="23" y2="10"></line>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-value" id="totalCollectedStats">0 FCFA</div>
+                                <div class="stat-label">Montant Collecté</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Liste des clients -->
+                    <div class="clients-list-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-users"></i> Clients et leurs Lots</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="lotsClientsTable"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -433,7 +652,21 @@ firebase.auth().onAuthStateChanged(function(user) {
                         <select id="statsYearFilter" class="filter-select">
                             <option value="">Année</option>
                         </select>
-<button id="exportStatsBtn" class="btn btn-primary">Exporter</button>
+                        <!-- Filtres période personnalisée -->
+                        <div style="display: flex; gap: 10px; align-items: flex-end; margin-left: 20px;">
+                            <div style="display: flex; flex-direction: column;">
+                                <label style="font-size: 11px; color: #5D6D7E; margin-bottom: 3px;">Début</label>
+                                <input type="month" id="statsStartDate" class="filter-select" style="padding: 6px 10px; font-size: 13px;">
+                            </div>
+                            <div style="display: flex; flex-direction: column;">
+                                <label style="font-size: 11px; color: #5D6D7E; margin-bottom: 3px;">Fin</label>
+                                <input type="month" id="statsEndDate" class="filter-select" style="padding: 6px 10px; font-size: 13px;">
+                            </div>
+                            <button id="applyStatsFilter" class="btn-secondary" style="margin-bottom: 0; padding: 6px 15px; font-size: 13px;">
+                                <i class="fas fa-check"></i> Appliquer
+                            </button>
+                        </div>
+                        <button id="exportStatsBtn" class="btn btn-primary">Exporter</button>
                     </div>
                 </div>
 
@@ -534,6 +767,38 @@ firebase.auth().onAuthStateChanged(function(user) {
                     </div>
                 </div>
             </div>
+
+            <!-- Onglet Notifications -->
+            <div class="tab-content" id="notifications">
+                <div class="tab-header">
+                    <h2 class="tab-title"><i class="fas fa-bell"></i> Toutes les Notifications</h2>
+                    <button class="btn btn-secondary" id="clearAllNotifications">
+                        <i class="fas fa-trash"></i> Tout effacer
+                    </button>
+                </div>
+
+                <div class="notifications-filters">
+                    <button class="filter-btn active" data-filter="all">
+                        <i class="fas fa-list"></i> Toutes
+                    </button>
+                    <button class="filter-btn" data-filter="unread">
+                        <i class="fas fa-envelope"></i> Non lues
+                    </button>
+                    <button class="filter-btn" data-filter="payment">
+                        <i class="fas fa-money-bill-wave"></i> Paiements
+                    </button>
+                    <button class="filter-btn" data-filter="deadline">
+                        <i class="fas fa-calendar-times"></i> Échéances
+                    </button>
+                    <button class="filter-btn" data-filter="alert">
+                        <i class="fas fa-exclamation-triangle"></i> Alertes
+                    </button>
+                </div>
+
+                <div class="notifications-page-container" id="notificationsPageContainer">
+                    <!-- Les notifications seront affichées ici -->
+                </div>
+            </div>
         </main>
 
 
@@ -549,6 +814,30 @@ firebase.auth().onAuthStateChanged(function(user) {
     </div>
 
     <div class="toast-container" id="toastContainer">
+    </div>
+
+    <!-- Modal pour éditer le prix d'un lot -->
+    <div class="modal-overlay" id="editLotPriceModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>Éditer le Prix du Lot</h2>
+                <button class="modal-close" id="editLotPriceClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px;">
+                    <label>Nom du Lot :</label>
+                    <input type="text" id="editLotName" disabled style="background: #f0f0f0; padding: 10px; width: 100%; border: 1px solid #ddd; border-radius: 6px;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label>Nouveau Prix :</label>
+                    <input type="number" id="editLotPrice" placeholder="Entrez le prix" style="padding: 10px; width: 100%; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 15px; border-top: 1px solid #eee;">
+                <button class="btn btn-secondary" id="editLotPriceCancelBtn">Annuler</button>
+                <button class="btn btn-primary" id="editLotPriceSaveBtn">Enregistrer</button>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>
@@ -623,8 +912,8 @@ window.addEventListener('load', () => {
         </button>
         
         <button class="bottom-nav-btn" data-tab="lots">
-            <i class="fas fa-home"></i>
-            <span>Lots</span>
+            <i class="fas fa-cog"></i>
+            <span>Gestion Lots</span>
         </button>
         
         <button class="bottom-nav-btn" data-tab="payments">

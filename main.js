@@ -9,7 +9,7 @@ function createWindow () {
   });
 
   // charge ton fichier HTML principal
-  win.loadFile('SIMMO 2.0 GESTION.html');
+  win.loadFile('CI Habitat GESTION.html');
 }
 
 app.whenReady().then(() => {
