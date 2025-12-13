@@ -1,7 +1,3 @@
-// Fonction utilitaire pour obtenir le nom du membre quelle que soit la clé
-function getMemberName(member) {
-    return member.name || member.nom_client || member["NOM CLIENT"] || member.nom || "(Nom inconnu)";
-}
 class PaymentManager {
     constructor() {
      this.db = firebase.database();
@@ -16,6 +12,7 @@ class PaymentManager {
 this.members = [];
 this.payments = [];
 this.lots = [];
+    this.config = {};
         this.currentTab = 'dashboard';
         this.currentMonth = new Date().getMonth();
         this.currentYear = new Date().getFullYear();
@@ -27,6 +24,7 @@ this.lots = [];
         this.members = snapshot.val() || [];
         this.renderMembers();
         this.updateDashboard();
+        this.maybeMigrateUnitPrice();
     });
 
     // Charger paiements en temps réel
@@ -41,6 +39,18 @@ this.lots = [];
         this.lots = snapshot.val() || [];
         this.renderLots();
         this.updateDashboard();
+        this.maybeMigrateUnitPrice();
+    });
+
+    // Charger config en temps réel (inclut unitPrice)
+    this.db.ref(`users/${this.userId}/appData/config`).on('value', (snapshot) => {
+        this.config = snapshot.val() || {};
+        const unitEl = document.getElementById('currentUnitPrice');
+        if (unitEl) unitEl.textContent = this.formatCurrency(this.getUnitPrice());
+        this.renderLots();
+        this.renderMembers();
+        this.updateDashboard();
+        this.maybeMigrateUnitPrice();
     });
 }
 
@@ -54,6 +64,17 @@ savePayments() {
 
 saveLots() {
     this.db.ref(`users/${this.userId}/appData/lots`).set(this.lots);
+}
+
+saveConfig() {
+    this.db.ref(`users/${this.userId}/appData/config`).set(this.config || {});
+}
+
+getUnitPrice() {
+    if (this.config && this.config.unitPrice != null) {
+        return Number(this.config.unitPrice) || 0;
+    }
+    return this.lots && this.lots.length > 0 ? Number(this.lots[0].price) || 0 : 0;
 }
 
 getSvgIcon(name, size = 20) {
@@ -850,41 +871,96 @@ document.querySelectorAll('.modal-tab').forEach(tab => {
                 }
             });
         }
-       document.getElementById('exportPDF').addEventListener('click', () => {
-    this.generateStyledMonthlyReport();
-});
-        document.getElementById('exportPaymentsPDF').addEventListener('click', () => {
-            this.exportPaymentsToPDF();
-        });
-        document.getElementById('viewAllPayments').addEventListener('click', () => {
-            this.switchTab('payments');
-        });
-        document.getElementById('exportStatsBtn').addEventListener('click', () => {
-            this.exportStatistics();
-        });
-        document.getElementById('statsYearFilter').addEventListener('change', () => {
-            this.updateStatistics();
-        });
+        const editUnitPriceBtn = document.getElementById('editUnitPriceBtn');
+        if (editUnitPriceBtn) {
+            editUnitPriceBtn.addEventListener('click', () => {
+                const modal = document.getElementById('editUnitPriceModal');
+                const input = document.getElementById('editUnitPrice');
+                if (input) input.value = this.getUnitPrice() || '';
+                if (modal) modal.classList.add('active');
 
-        document.getElementById('modalClose').addEventListener('click', () => {
-            this.closeModal();
-        });
+                const saveBtn = document.getElementById('editUnitPriceSaveBtn');
+                const cancelBtn = document.getElementById('editUnitPriceCancelBtn');
+                const closeBtn = document.getElementById('editUnitPriceClose');
+
+                const cleanup = () => {
+                    if (modal) modal.classList.remove('active');
+                    if (saveBtn) saveBtn.removeEventListener('click', handleSave);
+                    if (cancelBtn) cancelBtn.removeEventListener('click', handleCancel);
+                    if (closeBtn) closeBtn.removeEventListener('click', handleCancel);
+                };
+
+                const handleCancel = () => { cleanup(); };
+
+                const handleSave = () => {
+                    const newPrice = parseFloat(input.value);
+                    if (isNaN(newPrice) || newPrice < 0) {
+                        this.showToast('Veuillez entrer un prix valide', 'error');
+                        return;
+                    }
+                    this.config = this.config || {};
+                    this.config.unitPrice = newPrice;
+                    this.saveConfig();
+
+                    try {
+                        this.members = (this.members || []).map(member => {
+                            const num = parseInt(member.numberOfLots) || 1;
+                            const duration = parseInt(member.paymentDuration || member.duration) || 0;
+                            const total = num * newPrice;
+                            const monthly = duration > 0 ? Math.round((total / duration) / 100) * 100 : 0;
+                            member.unitPrice = newPrice;
+                            member.totalLotAmount = total;
+                            member.monthlyQuota = monthly;
+                            member.duration = duration || member.duration;
+                            return member;
+                        });
+                        this.saveMembers();
+                    } catch (err) {
+                        console.error('Erreur en recalculant les membres après modification du prix global :', err);
+                    }
+
+                    this.renderLots();
+                    this.renderMembers();
+                    this.updateDashboard();
+                    this.showToast('Prix unitaire global mis à jour', 'success');
+                    cleanup();
+                };
+
+                if (cancelBtn) cancelBtn.addEventListener('click', handleCancel);
+                if (closeBtn) closeBtn.addEventListener('click', handleCancel);
+                if (saveBtn) saveBtn.addEventListener('click', handleSave);
+            });
+        }
+        const exportPDFBtn = document.getElementById('exportPDF');
+        if (exportPDFBtn) exportPDFBtn.addEventListener('click', () => { this.generateStyledMonthlyReport(); });
+
+        const exportPaymentsPDFBtn = document.getElementById('exportPaymentsPDF');
+        if (exportPaymentsPDFBtn) exportPaymentsPDFBtn.addEventListener('click', () => { this.exportPaymentsToPDF(); });
+
+        const viewAllPaymentsBtn = document.getElementById('viewAllPayments');
+        if (viewAllPaymentsBtn) viewAllPaymentsBtn.addEventListener('click', () => { this.switchTab('payments'); });
+
+        const exportStatsBtn = document.getElementById('exportStatsBtn');
+        if (exportStatsBtn) exportStatsBtn.addEventListener('click', () => { this.exportStatistics(); });
+
+        const statsYearFilter = document.getElementById('statsYearFilter');
+        if (statsYearFilter) statsYearFilter.addEventListener('change', () => { this.updateStatistics(); });
+
+        const modalCloseBtn = document.getElementById('modalClose');
+        if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => { this.closeModal(); });
+
         // Clic sur l'overlay désactivé pour éviter fermeture accidentelle
-        // document.getElementById('modalOverlay').addEventListener('click', (e) => {
-        //     if (e.target === e.currentTarget) {
-        //         this.closeModal();
-        //     }
-        // });
+        // const modalOverlayEl = document.getElementById('modalOverlay');
+        // if (modalOverlayEl) modalOverlayEl.addEventListener('click', (e) => { if (e.target === e.currentTarget) this.closeModal(); });
 
-        document.getElementById('memberSearch').addEventListener('input', () => {
-            this.renderMembers();
-        });
-        document.getElementById('memberStatusFilter').addEventListener('change', () => {
-            this.renderMembers();
-        });
-        document.getElementById('memberUnpaidMonthsFilter').addEventListener('change', () => {
-            this.renderMembers();
-        });
+        const memberSearchEl = document.getElementById('memberSearch');
+        if (memberSearchEl) memberSearchEl.addEventListener('input', () => { this.renderMembers(); });
+
+        const memberStatusFilterEl = document.getElementById('memberStatusFilter');
+        if (memberStatusFilterEl) memberStatusFilterEl.addEventListener('change', () => { this.renderMembers(); });
+
+        const memberUnpaidMonthsFilterEl = document.getElementById('memberUnpaidMonthsFilter');
+        if (memberUnpaidMonthsFilterEl) memberUnpaidMonthsFilterEl.addEventListener('change', () => { this.renderMembers(); });
 
         const condensedBtn = document.getElementById('toggleCondensedMembers');
         if (condensedBtn) {
@@ -1073,10 +1149,10 @@ updateMonthlySummary() {
             return `
                 <div class="payment-item">
                     <div class="payment-avatar">
-                        ${member ? getMemberName(member).charAt(0).toUpperCase() : '?'}
+                        ${member ? member.name.charAt(0).toUpperCase() : '?'}
                     </div>
                     <div class="payment-info">
-                        <div class="payment-name">${member ? getMemberName(member) : 'Membre Inconnu'}</div>
+                        <div class="payment-name">${member ? member.name : 'Membre Inconnu'}</div>
                         <div class="payment-date">${this.formatDate(payment.date)}</div>
                     </div>
                     <div class="payment-amount">${this.formatCurrency(payment.amount)}</div>
@@ -1090,20 +1166,19 @@ updateMonthlySummary() {
 
         this.payments.slice(-5).forEach(payment => {
             const member = this.members.find(m => m.id === payment.memberId);
-            actions.push({
-                type: 'payment',
-                date: payment.date,
-                description: `Paiement de ${this.formatCurrency(payment.amount)} par ${member ? getMemberName(member) : 'Membre Inconnu'}`,
-                icon: '<i class="fas fa-dollar-sign"></i>'
-            });
-            if (member) {
-                actions.push({
-                    type: 'member',
-                    date: member.createdAt || new Date().toISOString(),
-                    description: `Nouveau membre ajouté: ${getMemberName(member)}`,
-                    icon: '<i class="fas fa-user-plus"></i>'
-                });
-            }
+ actions.push({
+    type: 'payment',
+    date: payment.date,
+    description: `Paiement de ${this.formatCurrency(payment.amount)} par ${member ? member.name : 'Membre Inconnu'}`,
+    icon: '<i class="fas fa-dollar-sign"></i>'
+});
+
+actions.push({
+    type: 'member',
+    date: member.createdAt || new Date().toISOString(),
+    description: `Nouveau membre ajouté: ${member.name}`,
+    icon: '<i class="fas fa-user-plus"></i>'
+});
         });
 
         actions.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1179,7 +1254,7 @@ updateMonthlySummary() {
         }
 
         // Totaux pour le pied de tableau
-        const lotPrice = this.lots.length > 0 ? this.lots[0].price : 0;
+        const lotPrice = this.getUnitPrice();
         const totals = filteredMembers.reduce((acc, member) => {
             const lotsCount = member.numberOfLots || 1;
             const totalLotAmount = lotsCount * lotPrice;
@@ -1225,7 +1300,7 @@ updateMonthlySummary() {
             const totalPaymentsAmount = memberPayments.reduce((sum, p) => sum + p.amount, 0);
             
             // Calcul de la mensualité de référence
-            const lotPrice = this.lots.length > 0 ? this.lots[0].price : 0;
+            const lotPrice = this.getUnitPrice();
             const totalLotAmount = (member.numberOfLots || 1) * lotPrice;
             const paymentDuration = member.paymentDuration || 12;
             const monthlyDue = totalLotAmount / paymentDuration;
@@ -1319,7 +1394,7 @@ updateMonthlySummary() {
                     <td class="cell-select"><input type="checkbox" class="member-select" data-member-id="${member.id}" ${isSelected ? 'checked' : ''}></td>
                     <td class="cell-name member-name-clickable" style="font-weight: 600; cursor: pointer; color: #6366F1;" data-member-id="${member.id}" title="Cliquez pour voir les détails">
                         ${showBell ? `<i class="fas fa-bell" style="color: #E74C3C; margin-right: 5px;" title="${unpaidMonthsCount} mois impayé${unpaidMonthsCount > 1 ? 's' : ''}"></i>` : ''}
-                        ${getMemberName(member)}
+                        ${member.name}
                     </td>
                     <td class="cell-center">${lotsCount}</td>
                     <td class="cell-amount" style="text-align: right; font-weight: 600;">${this.formatCurrency(totalLotAmount)}</td>
@@ -1544,7 +1619,7 @@ updateMonthlySummary() {
         if (statusFilter) {
             filteredMembers = filteredMembers.filter(member => {
                 const lotsCount = member.numberOfLots || 1;
-                const lotPrice = this.lots.length > 0 ? this.lots[0].price : 0;
+                const lotPrice = this.getUnitPrice();
                 const totalLotAmount = lotsCount * lotPrice;
                 const memberPayments = this.payments.filter(p => p.memberId === member.id);
                 const totalPaid = memberPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -1607,7 +1682,7 @@ updateMonthlySummary() {
         container.innerHTML = filteredMembers.map(member => {
             const memberPayments = this.payments.filter(p => p.memberId === member.id);
 
-            const lotPrice = this.lots.length > 0 ? this.lots[0].price : 0;
+            const lotPrice = this.getUnitPrice();
             const memberLotsTotal = (member.numberOfLots || 1) * lotPrice;
 
             const uniqueMonthsPaid = new Set(memberPayments.map(p => {
@@ -1968,7 +2043,7 @@ updateMonthlySummary() {
         
         // Lots du membre
         const numberOfLots = member.numberOfLots || 0;
-        const lotPrice = this.lots.length > 0 ? this.lots[0].price : 0;
+        const lotPrice = this.getUnitPrice();
         const totalLotsValue = numberOfLots * lotPrice;
         
         const reportHtml = `
@@ -2739,12 +2814,16 @@ closeLotDetailsModal() {
 
     renderLots() {
         // Nouvelle logique : afficher les stats du lot unique
-        const lotPrice = this.lots.length > 0 ? this.lots[0].price : 0;
+        const lotPrice = this.getUnitPrice();
         
         // Mettre à jour le prix affiché
         const priceDisplay = document.getElementById('currentLotPrice');
         if (priceDisplay) {
             priceDisplay.textContent = this.formatCurrency(lotPrice);
+        }
+        const unitDisplay = document.getElementById('currentUnitPrice');
+        if (unitDisplay) {
+            unitDisplay.textContent = this.formatCurrency(lotPrice);
         }
         
         // Calculer les statistiques
@@ -2954,7 +3033,23 @@ async exportLotToPDF(lotId) {
 
     showAddMemberModal() {
         // Récupérer le prix d'un lot (tous les lots ont le même prix)
-        const lotPrice = this.lots.length > 0 ? this.lots[0].price : 0;
+        const lotPrice = this.getUnitPrice();
+
+        // Si aucun lot n'est créé, afficher un message utile et empêcher la création de membre
+        if (!this.lots || this.lots.length === 0) {
+            const contentNoLot = `
+                <div style="padding:20px; max-width:520px;">
+                    <p style="color:#b71c1c; font-weight:600; font-size:1.05em;">Aucun lot configuré</p>
+                    <p>Vous devez d'abord créer au moins un lot avec un prix unitaire avant d'ajouter des membres. Le principe du site repose sur un prix unitaire fixe.</p>
+                    <div style="text-align:right; margin-top:16px;">
+                        <button class="btn btn-secondary" onclick="app.closeModal()">Fermer</button>
+                        <button class="btn btn-primary" onclick="app.switchTab('lots'); app.closeModal();">Aller aux Lots</button>
+                    </div>
+                </div>
+            `;
+            this.showModal('Aucun Lot', contentNoLot);
+            return;
+        }
 
         const content = `
             <form id="memberForm">
@@ -2964,7 +3059,7 @@ async exportLotToPDF(lotId) {
                 </div>
                 <div class="form-group">
                     <label class="form-label">Email</label>
-                    <input type="email" class="form-input" id="memberEmail" required>
+                    <input type="email" class="form-input" id="memberEmail">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Téléphone</label>
@@ -3021,7 +3116,8 @@ async exportLotToPDF(lotId) {
         const startDateInput = document.getElementById('memberStartDate');
 
         if (startDateInput) {
-            startDateInput.value = new Date().toISOString().split('T')[0];
+            // Default start to July 1, 2025 as requested
+            startDateInput.value = '2025-07-01';
         }
 
         const updateQuota = () => {
@@ -3039,6 +3135,8 @@ async exportLotToPDF(lotId) {
             const safeStartDate = isNaN(startDateValue.getTime()) ? new Date() : startDateValue;
             const endDate = new Date(safeStartDate);
             endDate.setMonth(endDate.getMonth() + duration);
+            // Show end as the last day of the previous month (e.g., for 12 months from July -> end in June)
+            endDate.setDate(endDate.getDate() - 1);
 
             calculatedStartDate.textContent = this.formatDate(safeStartDate.toISOString());
             calculatedEndDate.textContent = this.formatDate(endDate.toISOString());
@@ -3256,12 +3354,22 @@ async exportLotToPDF(lotId) {
             return lot ? lot.name : 'Lot inconnu';
         }).join(', ') : 'Aucun lot assigné';
 
-        document.getElementById('selectedMemberName').textContent = member.name;
-        document.getElementById('selectedMemberDetails').innerHTML =
-            `${member.email} • ${member.phone}<br>
-            <strong>Lots:</strong> ${memberLots}<br>
-            <strong>Quota mensuel:</strong> ${this.formatCurrency(member.monthlyQuota)} •
-            <strong>Durée:</strong> ${member.paymentDuration} mois`;
+        const nameEl = document.getElementById('selectedMemberName');
+        const detailsEl = document.getElementById('selectedMemberDetails');
+        if (nameEl) nameEl.textContent = member.name;
+
+        if (detailsEl) {
+            const contactParts = [];
+            if (member.email) contactParts.push(member.email);
+            if (member.phone) contactParts.push(member.phone);
+            const contactLine = contactParts.length ? contactParts.join(' • ') : '—';
+
+            detailsEl.innerHTML =
+                `${contactLine}<br>
+                <strong>Lots:</strong> ${memberLots}<br>
+                <strong>Quota mensuel:</strong> ${this.formatCurrency(member.monthlyQuota)} •
+                <strong>Durée:</strong> ${member.paymentDuration} mois`;
+        }
         document.getElementById('selectedMemberInfo').style.display = 'block';
     }
 
@@ -3753,6 +3861,10 @@ addMember(memberData) {
 }
 
     addMember() {
+        if (!this.lots || this.lots.length === 0) {
+            this.showToast("Impossible d'ajouter un membre : aucun lot n'est configuré.", 'error');
+            return;
+        }
         const name = document.getElementById('memberName').value;
         const email = document.getElementById('memberEmail').value;
         const phone = document.getElementById('memberPhone').value;
@@ -3761,7 +3873,7 @@ addMember(memberData) {
         const paymentDuration = parseInt(document.getElementById('paymentDuration').value);
 
         // Récupérer le prix unitaire d'un lot
-        const lotPrice = this.lots.length > 0 ? this.lots[0].price : 0;
+        const lotPrice = this.getUnitPrice();
         const totalPrice = numberOfLots * lotPrice;
         const monthlyQuota = paymentDuration > 0 ? Math.round((totalPrice / paymentDuration) / 100) * 100 : 0;
 
@@ -3770,14 +3882,21 @@ addMember(memberData) {
         const startDate = isNaN(parsedStartDate.getTime()) ? new Date() : parsedStartDate;
         const endDate = new Date(startDate);
         endDate.setMonth(endDate.getMonth() + paymentDuration);
+        // Store endDate as the last day before the next month so 12 months from July -> ends in June
+        endDate.setDate(endDate.getDate() - 1);
 
         const member = {
             id: this.generateId(),
             name,
             email,
             phone,
-            numberOfLots,  // Nombre de lots au lieu de array
+            numberOfLots,  // Nombre de lots
+            // stocker la durée sous deux clés pour compatibilité
             paymentDuration,
+            duration: paymentDuration,
+            // stocker le prix unitaire et le montant total calculé
+            unitPrice: lotPrice,
+            totalLotAmount: totalPrice,
             monthlyQuota,
             startDate: startDate.toISOString(),
             endDate: endDate.toISOString(),
@@ -3901,7 +4020,7 @@ addMember(memberData) {
         const member = this.members.find(m => m.id === memberId);
         if (!member) return;
 
-        const lotPrice = this.lots.length > 0 ? this.lots[0].price : 0;
+        const lotPrice = this.getUnitPrice();
         const totalAmount = (member.numberOfLots || 1) * lotPrice;
 
         const content = `
@@ -3912,7 +4031,7 @@ addMember(memberData) {
                 </div>
                 <div class="form-group">
                     <label class="form-label">Email</label>
-                    <input type="email" class="form-input" id="editMemberEmail" value="${member.email}" required>
+                    <input type="email" class="form-input" id="editMemberEmail" value="${member.email}">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Téléphone</label>
@@ -3980,7 +4099,7 @@ addMember(memberData) {
         const numberOfLots = parseInt(document.getElementById('editMemberNumberOfLots').value) || 1;
         const paymentDuration = parseInt(document.getElementById('editPaymentDuration').value);
 
-        const lotPrice = this.lots.length > 0 ? this.lots[0].price : 0;
+        const lotPrice = this.getUnitPrice();
         const totalPrice = numberOfLots * lotPrice;
         const monthlyQuota = totalPrice / paymentDuration;
 
@@ -4070,7 +4189,28 @@ addMember(memberData) {
                 return;
             }
             lot.price = newPrice;
+            // Enregistrer le nouveau prix
             this.saveLots();
+
+            // Recalculer les montants et quotas des membres en fonction du nouveau prix unitaire
+            try {
+                this.members = (this.members || []).map(member => {
+                    const num = parseInt(member.numberOfLots) || 1;
+                    const duration = parseInt(member.paymentDuration || member.duration) || 0;
+                    const total = num * newPrice;
+                    const monthly = duration > 0 ? Math.round((total / duration) / 100) * 100 : 0;
+                    member.unitPrice = newPrice;
+                    member.totalLotAmount = total;
+                    member.monthlyQuota = monthly;
+                    // garder la compatibilité des clés
+                    member.duration = duration || member.duration;
+                    return member;
+                });
+                this.saveMembers();
+            } catch (err) {
+                console.error('Erreur en recalculant les membres après changement de prix :', err);
+            }
+
             this.renderLots();
             this.renderMembers();
             this.updateDashboard();
@@ -4539,10 +4679,27 @@ this.saveLots();
     }
 
     updateStatistics() {
-        this.populateYearFilter();
+        this.setupStatsFilters();
         this.updateStatisticsOverview();
         this.updateMonthlyChart();
         this.updatePerformanceTable();
+    }
+
+    setupStatsFilters() {
+        if (this._statsFilterInitialized) return;
+        this._statsFilterInitialized = true;
+        const startEl = document.getElementById('statsStartDate');
+        const endEl = document.getElementById('statsEndDate');
+        const applyBtn = document.getElementById('applyStatsFilter');
+        const now = new Date();
+        // Default start to July 2025 as requested
+        if (startEl && !startEl.value) startEl.value = '2025-07';
+        if (endEl && !endEl.value) endEl.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        if (applyBtn) applyBtn.addEventListener('click', () => {
+            this.updateStatisticsOverview();
+            this.updateMonthlyChart();
+            this.updatePerformanceTable();
+        });
     }
 
     populateYearFilter() {
@@ -4576,16 +4733,27 @@ this.saveLots();
     }
 
     updateStatisticsOverview() {
-        const selectedYear = document.getElementById('statsYearFilter').value;
+        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
+        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
         let filteredPayments = this.payments;
         let filteredMembers = this.members;
 
-        if (selectedYear) {
+        let startDate = null;
+        let endDate = null;
+        if (startVal) startDate = new Date(startVal + '-01');
+        if (endVal) {
+            const tmp = new Date(endVal + '-01');
+            endDate = new Date(tmp.getFullYear(), tmp.getMonth() + 1, 0); // last day of month
+        }
+
+        if (startDate && endDate) {
             filteredPayments = this.payments.filter(payment => {
-                return new Date(payment.date).getFullYear() == selectedYear;
+                const d = new Date(payment.date);
+                return d >= startDate && d <= endDate;
             });
             filteredMembers = this.members.filter(member => {
-                return new Date(member.createdAt || new Date()).getFullYear() == selectedYear;
+                const d = new Date(member.createdAt || new Date());
+                return d >= startDate && d <= endDate;
             });
         }
 
@@ -4600,41 +4768,56 @@ this.saveLots();
     }
 
     updateMonthlyChart() {
-        const selectedYear = document.getElementById('statsYearFilter').value || new Date().getFullYear();
+        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
+        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
         const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
         const chartContainer = document.getElementById('monthlyChart');
         chartContainer.innerHTML = '';
 
-        const monthlyData = {};
-
-        for (let i = 0; i < 12; i++) {
-            monthlyData[i] = { payments: 0, amount: 0, newMembers: 0 };
+        // build months range
+        let months = [];
+        if (startVal && endVal) {
+            let cur = new Date(startVal + '-01');
+            const endDate = new Date(endVal + '-01');
+            while (cur <= endDate) {
+                months.push({ year: cur.getFullYear(), month: cur.getMonth() });
+                cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+            }
+        } else {
+            // default: current year full 12 months
+            const y = new Date().getFullYear();
+            for (let m = 0; m < 12; m++) months.push({ year: y, month: m });
         }
+
+        // initialize monthly data map keyed by YYYY-MM
+        const monthlyData = {};
+        months.forEach(m => {
+            const key = `${m.year}-${String(m.month+1).padStart(2,'0')}`;
+            monthlyData[key] = { payments: 0, amount: 0, newMembers: 0, label: `${monthNames[m.month]} ${m.year}` };
+        });
 
         this.payments.forEach(payment => {
             const paymentDate = new Date(payment.date);
-            if (paymentDate.getFullYear() == selectedYear) {
-                const month = paymentDate.getMonth();
-                monthlyData[month].payments++;
-                monthlyData[month].amount += payment.amount;
+            const key = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth()+1).padStart(2,'0')}`;
+            if (monthlyData[key]) {
+                monthlyData[key].payments++;
+                monthlyData[key].amount += payment.amount || 0;
             }
         });
 
         this.members.forEach(member => {
             const memberDate = new Date(member.createdAt || new Date());
-            if (memberDate.getFullYear() == selectedYear) {
-                const month = memberDate.getMonth();
-                monthlyData[month].newMembers++;
-            }
+            const key = `${memberDate.getFullYear()}-${String(memberDate.getMonth()+1).padStart(2,'0')}`;
+            if (monthlyData[key]) monthlyData[key].newMembers++;
         });
 
-        const maxPayments = Math.max(...Object.values(monthlyData).map(m => m.payments));
-        const maxMembers = Math.max(...Object.values(monthlyData).map(m => m.newMembers));
-        const maxValue = Math.max(maxPayments, maxMembers);
+        const values = Object.values(monthlyData);
+        const maxPayments = Math.max(...values.map(m => m.payments), 0);
+        const maxMembers = Math.max(...values.map(m => m.newMembers), 0);
+        const maxValue = Math.max(maxPayments, maxMembers, 1);
 
-        for (let i = 0; i < 12; i++) {
-            const data = monthlyData[i];
+        values.forEach(data => {
             const paymentHeight = maxValue > 0 ? (data.payments / maxValue) * 180 : 0;
             const memberHeight = maxValue > 0 ? (data.newMembers / maxValue) * 180 : 0;
 
@@ -4647,10 +4830,10 @@ this.saveLots();
                 <div class="chart-bar-container">
                     <div class="chart-bar-fill secondary" style="height: ${memberHeight}px;" title="Nouveaux membres: ${data.newMembers}"></div>
                 </div>
-                <div class="chart-bar-label">${monthNames[i]}</div>
+                <div class="chart-bar-label">${data.label}</div>
             `;
             chartContainer.appendChild(barContainer);
-        }
+        });
     }
 
 formatCurrencyForPDF(amount) {
@@ -4683,37 +4866,53 @@ getIconDataURL(iconClass, color = '#2C3E50', size = 16) {
 }
 
     updatePerformanceTable() {
-        const selectedYear = document.getElementById('statsYearFilter').value || new Date().getFullYear();
+        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
+        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
+        const selectedYear = null; // unused when range is set below
         const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
         const tableBody = document.getElementById('performanceTableBody');
         tableBody.innerHTML = '';
 
-        const monthlyData = {};
-
-        for (let i = 0; i < 12; i++) {
-            monthlyData[i] = { payments: 0, amount: 0, newMembers: 0 };
+        // build months range (default current year)
+        let months = [];
+        if (startVal && endVal) {
+            let cur = new Date(startVal + '-01');
+            const endDate = new Date(endVal + '-01');
+            while (cur <= endDate) {
+                months.push({ year: cur.getFullYear(), month: cur.getMonth() });
+                cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+            }
+        } else {
+            const y = new Date().getFullYear();
+            for (let m = 0; m < 12; m++) months.push({ year: y, month: m });
         }
+
+        const monthlyData = {};
+        months.forEach(m => monthlyData[m.month] = { payments: 0, amount: 0, newMembers: 0, label: `${m.month+1}/${m.year}` });
 
         this.payments.forEach(payment => {
             const paymentDate = new Date(payment.date);
-            if (paymentDate.getFullYear() == selectedYear) {
-                const month = paymentDate.getMonth();
-                monthlyData[month].payments++;
-                monthlyData[month].amount += payment.amount;
-            }
+            months.forEach((m, idx) => {
+                if (paymentDate.getFullYear() === m.year && paymentDate.getMonth() === m.month) {
+                    monthlyData[m.month].payments++;
+                    monthlyData[m.month].amount += payment.amount || 0;
+                }
+            });
         });
 
         this.members.forEach(member => {
             const memberDate = new Date(member.createdAt || new Date());
-            if (memberDate.getFullYear() == selectedYear) {
-                const month = memberDate.getMonth();
-                monthlyData[month].newMembers++;
-            }
+            months.forEach(m => {
+                if (memberDate.getFullYear() === m.year && memberDate.getMonth() === m.month) {
+                    monthlyData[m.month].newMembers++;
+                }
+            });
         });
 
-        for (let i = 0; i < 12; i++) {
-            const data = monthlyData[i];
+        for (let i = 0; i < months.length; i++) {
+            const m = months[i];
+            const data = monthlyData[m.month];
             const completionRate = this.members.length > 0 ? Math.round((data.payments / this.members.length) * 100) : 0;
 
             let performanceBadge = '';
@@ -4727,7 +4926,7 @@ getIconDataURL(iconClass, color = '#2C3E50', size = 16) {
 
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${monthNames[i]}</td>
+                <td>${monthNames[m.month]}</td>
                 <td>${data.payments}</td>
                 <td>${this.formatCurrency(data.amount)}</td>
                 <td>${data.newMembers}</td>
@@ -4738,8 +4937,10 @@ getIconDataURL(iconClass, color = '#2C3E50', size = 16) {
     }
 
     exportStatist() {
-        const selectedYear = document.getElementById('statsYearFilter').value || new Date().getFullYear();
-        this.showToast(`Export des statistiques ${selectedYear} terminé!`, 'success');
+        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
+        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
+        const label = startVal && endVal ? `${startVal} → ${endVal}` : 'période sélectionnée';
+        this.showToast(`Export des statistiques ${label} terminé!`, 'success');
     }
 
 printReceipt(paymentId) {
@@ -5877,78 +6078,49 @@ function initViewToggle() {
     });
 }
 
-// ======================
-// IMPORT JSON MEMBRES
-// ======================
-function importerJSON() {
-    const input = document.getElementById('jsonFileInput');
-    const resultat = document.getElementById('resultat');
-    if (!input || !resultat) return;
-    if (input.files.length === 0) {
-        resultat.textContent = "Aucun fichier sélectionné.";
-        return;
-    }
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = function(e) {
+PaymentManager.prototype.maybeMigrateUnitPrice = function() {
+        if (this._migrationDone) return;
+        if (this._migrating) return;
+        this._migrating = true;
+
         try {
-            const data = JSON.parse(e.target.result);
-            // Ajout direct dans PaymentManager si disponible
-            if (window.paymentManager && Array.isArray(data)) {
-                // Ajout des membres
-                window.paymentManager.members = data;
-                window.paymentManager.saveMembers();
-
-                // Ajout des paiements (si présents dans chaque membre)
-                let allPayments = [];
-                data.forEach((membre, idx) => {
-                    if (Array.isArray(membre.paiements)) {
-                        membre.paiements.forEach(paiement => {
-                            allPayments.push({
-                                memberId: membre.id || idx,
-                                nom_client: membre.nom_client || membre.nom || '',
-                                mois: paiement.mois,
-                                montant: paiement.montant
-                            });
-                        });
-                    } else if (membre.paiements && typeof membre.paiements === 'object') {
-                        // Si paiements est un objet (clé: mois)
-                        Object.entries(membre.paiements).forEach(([mois, montant]) => {
-                            allPayments.push({
-                                memberId: membre.id || idx,
-                                nom_client: membre.nom_client || membre.nom || '',
-                                mois,
-                                montant
-                            });
-                        });
-                    }
-                });
-                window.paymentManager.payments = allPayments;
-                window.paymentManager.savePayments();
-                window.paymentManager.renderMembers && window.paymentManager.renderMembers();
-                window.paymentManager.renderPayments && window.paymentManager.renderPayments();
-                resultat.textContent = "Importation réussie : membres et paiements enregistrés.";
-            } else {
-                afficherMembres(data);
+            // 1) If config.unitPrice is missing but we have a lot price, set it
+            if ((this.config == null || this.config.unitPrice == null) && this.lots && this.lots.length > 0) {
+                const inferred = Number(this.lots[0].price) || 0;
+                this.config = this.config || {};
+                this.config.unitPrice = inferred;
+                this.saveConfig();
             }
-        } catch (err) {
-            resultat.textContent = "Erreur de lecture du fichier JSON.";
-        }
-    };
-    reader.readAsText(file);
-}
 
-function afficherMembres(membres) {
-    const resultat = document.getElementById('resultat');
-    if (!resultat) return;
-    resultat.innerHTML = "";
-    if (!Array.isArray(membres)) {
-        resultat.textContent = "Format de données invalide.";
-        return;
+            const unit = this.getUnitPrice();
+            if (unit > 0 && Array.isArray(this.members)) {
+                let updated = false;
+                this.members = this.members.map(member => {
+                    const num = parseInt(member.numberOfLots) || 1;
+                    const duration = parseInt(member.paymentDuration || member.duration) || 0;
+                    const total = num * unit;
+                    const monthly = duration > 0 ? Math.round((total / duration) / 100) * 100 : 0;
+                    // If any key is missing or out of date, set and mark updated
+                    if (member.unitPrice !== unit || member.totalLotAmount !== total || member.monthlyQuota !== monthly || member.duration !== duration) {
+                        member.unitPrice = unit;
+                        member.totalLotAmount = total;
+                        member.monthlyQuota = monthly;
+                        member.duration = duration || member.duration;
+                        updated = true;
+                    }
+                    return member;
+                });
+
+                if (updated) {
+                    this.saveMembers();
+                }
+            }
+
+            // mark migration done for this session
+            this._migrationDone = true;
+        } catch (err) {
+            console.error('Erreur lors de la migration du prix unitaire/membres :', err);
+        } finally {
+            this._migrating = false;
+        }
     }
-    membres.forEach(membre => {
-        const div = document.createElement('div');
-        div.innerHTML = `<strong>${membre.nom_client || membre.nom || ''}</strong> - Lots: ${membre.nombre_lots || membre.lots || 0} - Montant versé: ${membre.montant_verse || 0} - Reste à payer: ${membre.reste_a_payer || 0}`;
-        resultat.appendChild(div);
-    });
-}

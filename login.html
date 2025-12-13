@@ -11,11 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <style>
     :root {
-      --primary: #6366F1;
-      --primary-dark: #4F46E5;
+      --primary: #2563EB;
+      --primary-dark: #1E40AF;
       --secondary: #27AE60;
       --accent: #E67E22;
-      --bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --bg: linear-gradient(180deg, #F7F9FC 0%, #FFFFFF 100%);
       --card-bg: #FFFFFF;
       --text-primary: #2C3E50;
       --text-secondary: #5D6D7E;
@@ -44,14 +44,15 @@
 
     .auth-container {
       width: 100%;
-      max-width: 1000px;
+      max-width: 440px; /* réduit encore */
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       background: var(--card-bg);
-      border-radius: 20px;
+      border-radius: 12px;
       box-shadow: var(--shadow);
       overflow: hidden;
-      animation: slideUp 0.6s ease-out;
+      animation: slideUp 0.45s ease-out;
+      margin: 18px; /* espacement autour */
     }
 
     @keyframes slideUp {
@@ -59,27 +60,12 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    /* Left brand panel removed to simplify login and remove purple */
     .auth-brand {
-      background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
-      padding: 60px 40px;
-      color: white;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
+      display: none;
     }
 
-    .auth-brand::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      right: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-      animation: pulse 15s infinite;
-    }
+    .auth-brand::before { display: none; }
 
     @keyframes pulse {
       0%, 100% { transform: scale(1); opacity: 0.5; }
@@ -146,7 +132,7 @@
     }
 
     .auth-forms {
-      padding: 60px 40px;
+      padding: 24px 18px; /* encore plus réduit */
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -261,9 +247,9 @@
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, #6366F1, #8B5CF6);
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
       color: white;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.18);
     }
 
     .btn-primary:hover {
@@ -464,14 +450,15 @@
 
     <!-- Right Panel: Forms -->
     <div class="auth-forms">
-      <div class="form-header">
-        <div class="form-tabs">
+      <div class="form-header" style="text-align:center;">
+        <img src="logo.jpeg" alt="Logo" style="width:56px;height:56px;border-radius:12px;margin:0 auto 12px;display:block;">
+        <h2 style="font-size:24px;margin-bottom:6px;color:var(--text-primary);">Bienvenue</h2>
+        <p style="color:var(--text-secondary);margin-bottom:18px;">Entrez votre email et mot de passe pour accéder à votre compte.</p>
+        <div class="form-tabs" style="display:flex;gap:8px;justify-content:center;margin-top:6px;">
           <button class="form-tab active" id="btnShowLogin">
             <i class="fas fa-sign-in-alt"></i> Connexion
           </button>
-          <button class="form-tab" id="btnShowSignup">
-            <i class="fas fa-user-plus"></i> Inscription
-          </button>
+      
         </div>
       </div>
 
@@ -493,17 +480,18 @@
           </div>
         </div>
 
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+          <input id="rememberMe" type="checkbox" style="width:16px;height:16px;">
+          <label for="rememberMe" style="font-size:13px;color:var(--text-secondary);">Se souvenir de moi</label>
+        </div>
+
         <button type="submit" class="btn btn-primary">
           <i class="fas fa-sign-in-alt"></i>
           <span>Se connecter</span>
           <div class="loader" id="loginLoader"></div>
         </button>
 
-        <div class="form-footer">
-          <a href="#" id="forgotPasswordLink" class="forgot-link">
-            <i class="fas fa-key"></i> Mot de passe oublié ?
-          </a>
-        </div>
+        <!-- Mot de passe oublié supprimé par demande utilisateur -->
 
         <div id="loginMsg" class="msg"></div>
 
@@ -588,7 +576,6 @@
     const signupMsg = document.getElementById('signupMsg');
     const loginLoader = document.getElementById('loginLoader');
     const signupLoader = document.getElementById('signupLoader');
-    const forgotPasswordLink = document.getElementById('forgotPasswordLink');
 
     function showMessage(element, message, type = 'error') {
       element.textContent = message;
@@ -695,23 +682,7 @@
       }
     });
 
-    // Forgot password
-    forgotPasswordLink.addEventListener('click', async (e) => {
-      e.preventDefault();
-      const email = document.getElementById('email').value.trim();
-      
-      if (!email) {
-        showMessage(loginMsg, 'Entrez votre email puis cliquez sur "Mot de passe oublié"', 'error');
-        return;
-      }
-      
-      try {
-        await auth.sendPasswordResetEmail(email);
-        showMessage(loginMsg, `Lien de réinitialisation envoyé à ${email}`, 'success');
-      } catch (err) {
-        showMessage(loginMsg, err.message || 'Erreur lors de l\'envoi du lien', 'error');
-      }
-    });
+    // 'Mot de passe oublié' supprimé — fonctionnalité volontairement retirée
   </script>
 </body>
 </html>
