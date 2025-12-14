@@ -33,7 +33,7 @@
     --font-size-title: 18px;
     --font-size-hero: 22px;
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --gradient-primary: linear-gradient(135deg, #ffffff, #ffffff);
+    --gradient-primary: linear-gradient(135deg, #6366F1, #8B5CF6);
     --gradient-secondary: linear-gradient(135deg, #27AE60, #2ECC71);
     --gradient-accent: linear-gradient(135deg, #E67E22, #F39C12);
     --gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 1));
@@ -67,7 +67,7 @@ body {
 }
 
 .header {
-    background: var(--primary);
+    background: var(--gradient-primary);
     color: white;
     padding: var(--spacing);
     box-shadow: var(--shadow-large);
@@ -6190,7 +6190,6 @@ body {
 
 .modal-header {
     background-color: #ffffff !important;
-    color: var(--text-primary) !important;
     padding: 24px 24px 16px 24px;
     border-bottom: 1px solid var(--border-color);
     border-radius: 16px 16px 0 0 !important;
@@ -6203,15 +6202,6 @@ body {
     background-color: #ffffff !important;
     padding: 20px 24px 24px 24px;
     border-radius: 0 0 16px 16px !important;
-}
-
-/* Ensure modal titles and close buttons are visible on white headers */
-.modal-header .modal-title {
-    color: var(--text-primary) !important;
-}
-.modal-header .modal-close {
-    color: var(--text-primary) !important;
-    background: rgba(0,0,0,0.04) !important;
 }
 
 @media (max-width: 768px) {
@@ -8024,80 +8014,3 @@ body.dark-mode .notifications-empty {
 .clients-lots-table .badge { background: var(--gradient-secondary); color: white; padding: 4px 12px; border-radius: 12px; font-size: var(--font-size-small); font-weight: 600; }
 .clients-lots-table .text-success { color: var(--success); font-weight: 600; }
 .clients-lots-table .text-danger { color: var(--danger); font-weight: 600; }
-
-/* Pill navigation styles */
-.pill-navbar {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 10px 20px;
-    position: absolute;
-    left: 50%;
-    top: 54%;
-    transform: translate(-50%, -50%);
-    z-index: 101;
-    width: 100%;
-    pointer-events: none; /* allow clicks to pass through except on inner elements */
-}
-.pill-inner {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    background: #111827;
-    color: #fff;
-    padding: 10px 22px;
-    border-radius: 999px;
-    box-shadow: 0 10px 30px rgba(16,24,40,0.15);
-    align-items: center;
-    max-width: 1000px;
-    width: auto;
-    pointer-events: auto; /* enable interaction inside the pill */
-}
-.pill-icon img {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    display: block;
-}
-.pill-left .pill-icon {
-    background: #fff;
-    padding: 4px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.pill-center {
-    display: flex;
-    gap: 16px;
-    align-items: center;
-    flex: 1 1 auto;
-    justify-content: center;
-}
-.pill-link {
-    background: transparent;
-    color: #e5e7eb;
-    border: none;
-    font-weight: 600;
-    padding: 8px 12px;
-    border-radius: 999px;
-    cursor: pointer;
-}
-.pill-link i { margin-right: 8px; font-size: 14px; vertical-align: middle; }
-.pill-link:hover { color: #fff; background: rgba(255,255,255,0.03); }
-.pill-link.active { color: #fff; background: rgba(255,255,255,0.06); }
-.pill-right { display: flex; align-items: center; }
-.pill-email {
-    background: #fff;
-    color: #111827;
-    padding: 8px 18px;
-    border-radius: 999px;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-@media (max-width: 900px) {
-    .pill-inner { gap: 10px; padding: 8px 12px; }
-    .pill-center { gap: 8px; }
-    .pill-email { display: none; }
-}

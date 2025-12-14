@@ -44,8 +44,8 @@ firebase.auth().onAuthStateChanged(function(user) {
     console.log('Utilisateur connecté:', user.email);
     
     function initApp() {
-    const userNameEl = document.getElementById('userName');
-    const userAvatarEl = document.getElementById('userAvatar');
+      const userNameEl = document.getElementById('userName');
+      const userAvatarEl = document.getElementById('userAvatar');
       if (userNameEl && user.displayName) {
         userNameEl.textContent = user.displayName;
       } else if (userNameEl) {
@@ -57,7 +57,6 @@ firebase.auth().onAuthStateChanged(function(user) {
       } else if (userAvatarEl && user.email) {
         userAvatarEl.textContent = user.email.substring(0, 2).toUpperCase();
       }
-            // pill email removed; no UI update required here
       
       const logoutBtn = document.getElementById('logoutBtn');
       if (logoutBtn) {
@@ -70,11 +69,9 @@ firebase.auth().onAuthStateChanged(function(user) {
         });
       }
       
-            if (typeof PaymentManager !== 'undefined' && !window.paymentManager) {
-                window.paymentManager = new PaymentManager();
-                // backward-compat alias: some inline onclick handlers use `app`
-                window.app = window.paymentManager;
-            }
+      if (typeof PaymentManager !== 'undefined' && !window.paymentManager) {
+        window.paymentManager = new PaymentManager();
+      }
     }
     
     if (document.readyState === 'loading') {
@@ -105,30 +102,37 @@ firebase.auth().onAuthStateChanged(function(user) {
   <span class="mobile-menu-icon">☰</span>
 </button>
 
-            <!-- logo removed (now inside pill navbar) -->
+            <div class="logo">
+    <img src="logo.jpeg" style="height: 40px; width: 40px; border-radius: 50%;" />  
+                <span class="logo-text">CI Habitat GESTION</span>
+            </div>
         </div>
         
-        <nav class="pill-navbar" aria-label="Main navigation">
-            <div class="pill-inner">
-                <div class="pill-left">
-                    <div class="pill-icon">
-                        <img src="logo.jpeg" alt="logo" />
-                    </div>
-                </div>
-
-                <div class="pill-center">
-                    <button class="nav-tab pill-link active" data-tab="dashboard"><i class="fas fa-chart-pie"></i> Tableau de bord</button>
-                    <button class="nav-tab pill-link" data-tab="members"><i class="fas fa-users"></i> Membres</button>
-                    <button class="nav-tab pill-link" data-tab="lots"><i class="fas fa-home"></i> Gestion des Lots</button>
-                    <button class="nav-tab pill-link" data-tab="payments"><i class="fas fa-credit-card"></i> Paiements</button>
-                    <button class="nav-tab pill-link" data-tab="statistics"><i class="fas fa-chart-line"></i> Statistiques</button>
-                    <button class="nav-tab pill-link" data-tab="notifications"><i class="fas fa-bell"></i> Notifications</button>
-                </div>
-
-                <div class="pill-right">
-                    <!-- email/pill removed as requested -->
-                </div>
-            </div>
+        <nav class="header-nav">
+            <button class="nav-tab active" data-tab="dashboard">
+    <img src="gauge-high-solid-full.svg" style="height: 25px; width: 40px; border-radius: 50%;" />  
+                Tableau de bord
+            </button>
+            <button class="nav-tab" data-tab="members">
+                <i class="fas fa-users"></i>
+                Membres
+            </button>
+            <button class="nav-tab" data-tab="lots">
+                <i class="fas fa-cog"></i>
+                Gestion des Lots
+            </button>
+            <button class="nav-tab" data-tab="payments">
+                <i class="fas fa-credit-card"></i>
+                Gestion des Paiements
+            </button>
+            <button class="nav-tab" data-tab="statistics">
+                <i class="fas fa-chart-line"></i>
+                Statistiques
+            </button>
+            <button class="nav-tab" data-tab="notifications">
+                <i class="fas fa-bell"></i>
+                Notifications
+            </button>
         </nav>
         
         <div class="header-right" style="display: flex; align-items: center; gap: 12px; z-index: 100;">
@@ -555,7 +559,13 @@ firebase.auth().onAuthStateChanged(function(user) {
                             <h3><i class="fas fa-tag"></i> Prix Unitaire du Lot</h3>
                         </div>
                         <div class="card-body">
-                           
+                            <div class="price-display" id="lotPriceDisplay">
+                                <span class="price-label">Prix par lot :</span>
+                                <span class="price-value" id="currentLotPrice">0 FCFA</span>
+                            </div>
+                            <button class="btn btn-primary" id="editLotPriceBtn">
+                                <i class="fas fa-edit"></i> Modifier le Prix
+                            </button>
                             <div style="height:12px"></div>
                             <div class="price-display" id="unitPriceDisplay" style="margin-top:10px;">
                                 <span class="price-label">Prix unitaire global :</span>
@@ -640,12 +650,10 @@ firebase.auth().onAuthStateChanged(function(user) {
                 <div class="tab-header">
                     <h2 class="tab-title">Statistiques</h2>
                     <div class="stats-controls">
-                        <div class="stats-date-range">
-                            <input type="month" id="statsStartDate" class="filter-select" aria-label="Date de début">
-                            <input type="month" id="statsEndDate" class="filter-select" aria-label="Date de fin">
-                            <button id="applyStatsFilter" class="btn btn-primary">Appliquer</button>
-                        </div>
-                        <button id="exportStatsBtn" class="btn btn-primary">Exporter</button>
+                        <select id="statsYearFilter" class="filter-select">
+                            <option value="">Année</option>
+                        </select>
+<button id="exportStatsBtn" class="btn btn-primary">Exporter</button>
                     </div>
                 </div>
 

@@ -931,36 +931,41 @@ document.querySelectorAll('.modal-tab').forEach(tab => {
                 if (saveBtn) saveBtn.addEventListener('click', handleSave);
             });
         }
-        const exportPDFBtn = document.getElementById('exportPDF');
-        if (exportPDFBtn) exportPDFBtn.addEventListener('click', () => { this.generateStyledMonthlyReport(); });
+       document.getElementById('exportPDF').addEventListener('click', () => {
+    this.generateStyledMonthlyReport();
+});
+        document.getElementById('exportPaymentsPDF').addEventListener('click', () => {
+            this.exportPaymentsToPDF();
+        });
+        document.getElementById('viewAllPayments').addEventListener('click', () => {
+            this.switchTab('payments');
+        });
+        document.getElementById('exportStatsBtn').addEventListener('click', () => {
+            this.exportStatistics();
+        });
+        document.getElementById('statsYearFilter').addEventListener('change', () => {
+            this.updateStatistics();
+        });
 
-        const exportPaymentsPDFBtn = document.getElementById('exportPaymentsPDF');
-        if (exportPaymentsPDFBtn) exportPaymentsPDFBtn.addEventListener('click', () => { this.exportPaymentsToPDF(); });
-
-        const viewAllPaymentsBtn = document.getElementById('viewAllPayments');
-        if (viewAllPaymentsBtn) viewAllPaymentsBtn.addEventListener('click', () => { this.switchTab('payments'); });
-
-        const exportStatsBtn = document.getElementById('exportStatsBtn');
-        if (exportStatsBtn) exportStatsBtn.addEventListener('click', () => { this.exportStatistics(); });
-
-        const statsYearFilter = document.getElementById('statsYearFilter');
-        if (statsYearFilter) statsYearFilter.addEventListener('change', () => { this.updateStatistics(); });
-
-        const modalCloseBtn = document.getElementById('modalClose');
-        if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => { this.closeModal(); });
-
+        document.getElementById('modalClose').addEventListener('click', () => {
+            this.closeModal();
+        });
         // Clic sur l'overlay désactivé pour éviter fermeture accidentelle
-        // const modalOverlayEl = document.getElementById('modalOverlay');
-        // if (modalOverlayEl) modalOverlayEl.addEventListener('click', (e) => { if (e.target === e.currentTarget) this.closeModal(); });
+        // document.getElementById('modalOverlay').addEventListener('click', (e) => {
+        //     if (e.target === e.currentTarget) {
+        //         this.closeModal();
+        //     }
+        // });
 
-        const memberSearchEl = document.getElementById('memberSearch');
-        if (memberSearchEl) memberSearchEl.addEventListener('input', () => { this.renderMembers(); });
-
-        const memberStatusFilterEl = document.getElementById('memberStatusFilter');
-        if (memberStatusFilterEl) memberStatusFilterEl.addEventListener('change', () => { this.renderMembers(); });
-
-        const memberUnpaidMonthsFilterEl = document.getElementById('memberUnpaidMonthsFilter');
-        if (memberUnpaidMonthsFilterEl) memberUnpaidMonthsFilterEl.addEventListener('change', () => { this.renderMembers(); });
+        document.getElementById('memberSearch').addEventListener('input', () => {
+            this.renderMembers();
+        });
+        document.getElementById('memberStatusFilter').addEventListener('change', () => {
+            this.renderMembers();
+        });
+        document.getElementById('memberUnpaidMonthsFilter').addEventListener('change', () => {
+            this.renderMembers();
+        });
 
         const condensedBtn = document.getElementById('toggleCondensedMembers');
         if (condensedBtn) {
@@ -3032,9 +3037,24 @@ async exportLotToPDF(lotId) {
 }
 
     showAddMemberModal() {
-        // Récupérer le prix d'un lot (tous les lots ont le même prix). Autoriser création même sans lots.
-        const fetchedPrice = this.getUnitPrice();
-        const lotPrice = (fetchedPrice == null) ? 1500000 : fetchedPrice;
+        // Récupérer le prix d'un lot (tous les lots ont le même prix)
+        const lotPrice = this.getUnitPrice();
+
+        // Si aucun lot n'est créé, afficher un message utile et empêcher la création de membre
+        if (!this.lots || this.lots.length === 0) {
+            const contentNoLot = `
+                <div style="padding:20px; max-width:520px;">
+                    <p style="color:#b71c1c; font-weight:600; font-size:1.05em;">Aucun lot configuré</p>
+                    <p>Vous devez d'abord créer au moins un lot avec un prix unitaire avant d'ajouter des membres. Le principe du site repose sur un prix unitaire fixe.</p>
+                    <div style="text-align:right; margin-top:16px;">
+                        <button class="btn btn-secondary" onclick="app.closeModal()">Fermer</button>
+                        <button class="btn btn-primary" onclick="app.switchTab('lots'); app.closeModal();">Aller aux Lots</button>
+                    </div>
+                </div>
+            `;
+            this.showModal('Aucun Lot', contentNoLot);
+            return;
+        }
 
         const content = `
             <form id="memberForm">
@@ -3044,7 +3064,7 @@ async exportLotToPDF(lotId) {
                 </div>
                 <div class="form-group">
                     <label class="form-label">Email</label>
-                    <input type="email" class="form-input" id="memberEmail">
+                    <input type="email" class="form-input" id="memberEmail" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Téléphone</label>
@@ -3057,7 +3077,7 @@ async exportLotToPDF(lotId) {
                 <div class="form-group">
                     <label class="form-label">Nombre de lots</label>
                     <input type="number" class="form-input" id="memberNumberOfLots" min="1" value="1" required>
-                    <small style="color: #666; margin-top: 5px; display: block;">Prix unitaire: ${this.formatCurrency(lotPrice)}${fetchedPrice == null ? ' (par défaut)' : ''}</small>
+                    <small style="color: #666; margin-top: 5px; display: block;">Prix unitaire: ${this.formatCurrency(lotPrice)}</small>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Durée de paiement (en mois)</label>
@@ -3101,8 +3121,7 @@ async exportLotToPDF(lotId) {
         const startDateInput = document.getElementById('memberStartDate');
 
         if (startDateInput) {
-            // Default start to July 1, 2025 as requested
-            startDateInput.value = '2025-07-01';
+            startDateInput.value = new Date().toISOString().split('T')[0];
         }
 
         const updateQuota = () => {
@@ -3120,8 +3139,6 @@ async exportLotToPDF(lotId) {
             const safeStartDate = isNaN(startDateValue.getTime()) ? new Date() : startDateValue;
             const endDate = new Date(safeStartDate);
             endDate.setMonth(endDate.getMonth() + duration);
-            // Show end as the last day of the previous month (e.g., for 12 months from July -> end in June)
-            endDate.setDate(endDate.getDate() - 1);
 
             calculatedStartDate.textContent = this.formatDate(safeStartDate.toISOString());
             calculatedEndDate.textContent = this.formatDate(endDate.toISOString());
@@ -3339,22 +3356,12 @@ async exportLotToPDF(lotId) {
             return lot ? lot.name : 'Lot inconnu';
         }).join(', ') : 'Aucun lot assigné';
 
-        const nameEl = document.getElementById('selectedMemberName');
-        const detailsEl = document.getElementById('selectedMemberDetails');
-        if (nameEl) nameEl.textContent = member.name;
-
-        if (detailsEl) {
-            const contactParts = [];
-            if (member.email) contactParts.push(member.email);
-            if (member.phone) contactParts.push(member.phone);
-            const contactLine = contactParts.length ? contactParts.join(' • ') : '—';
-
-            detailsEl.innerHTML =
-                `${contactLine}<br>
-                <strong>Lots:</strong> ${memberLots}<br>
-                <strong>Quota mensuel:</strong> ${this.formatCurrency(member.monthlyQuota)} •
-                <strong>Durée:</strong> ${member.paymentDuration} mois`;
-        }
+        document.getElementById('selectedMemberName').textContent = member.name;
+        document.getElementById('selectedMemberDetails').innerHTML =
+            `${member.email} • ${member.phone}<br>
+            <strong>Lots:</strong> ${memberLots}<br>
+            <strong>Quota mensuel:</strong> ${this.formatCurrency(member.monthlyQuota)} •
+            <strong>Durée:</strong> ${member.paymentDuration} mois`;
         document.getElementById('selectedMemberInfo').style.display = 'block';
     }
 
@@ -3846,7 +3853,10 @@ addMember(memberData) {
 }
 
     addMember() {
-        // Allow adding members even if no lots exist; unit price will default to 0 if not configured
+        if (!this.lots || this.lots.length === 0) {
+            this.showToast("Impossible d'ajouter un membre : aucun lot n'est configuré.", 'error');
+            return;
+        }
         const name = document.getElementById('memberName').value;
         const email = document.getElementById('memberEmail').value;
         const phone = document.getElementById('memberPhone').value;
@@ -3855,8 +3865,7 @@ addMember(memberData) {
         const paymentDuration = parseInt(document.getElementById('paymentDuration').value);
 
         // Récupérer le prix unitaire d'un lot
-        const fetchedPrice = this.getUnitPrice();
-        const lotPrice = (fetchedPrice == null) ? 1500000 : fetchedPrice;
+        const lotPrice = this.getUnitPrice();
         const totalPrice = numberOfLots * lotPrice;
         const monthlyQuota = paymentDuration > 0 ? Math.round((totalPrice / paymentDuration) / 100) * 100 : 0;
 
@@ -3865,8 +3874,6 @@ addMember(memberData) {
         const startDate = isNaN(parsedStartDate.getTime()) ? new Date() : parsedStartDate;
         const endDate = new Date(startDate);
         endDate.setMonth(endDate.getMonth() + paymentDuration);
-        // Store endDate as the last day before the next month so 12 months from July -> ends in June
-        endDate.setDate(endDate.getDate() - 1);
 
         const member = {
             id: this.generateId(),
@@ -4014,7 +4021,7 @@ addMember(memberData) {
                 </div>
                 <div class="form-group">
                     <label class="form-label">Email</label>
-                    <input type="email" class="form-input" id="editMemberEmail" value="${member.email}">
+                    <input type="email" class="form-input" id="editMemberEmail" value="${member.email}" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Téléphone</label>
@@ -4662,27 +4669,10 @@ this.saveLots();
     }
 
     updateStatistics() {
-        this.setupStatsFilters();
+        this.populateYearFilter();
         this.updateStatisticsOverview();
         this.updateMonthlyChart();
         this.updatePerformanceTable();
-    }
-
-    setupStatsFilters() {
-        if (this._statsFilterInitialized) return;
-        this._statsFilterInitialized = true;
-        const startEl = document.getElementById('statsStartDate');
-        const endEl = document.getElementById('statsEndDate');
-        const applyBtn = document.getElementById('applyStatsFilter');
-        const now = new Date();
-        // Default start to July 2025 as requested
-        if (startEl && !startEl.value) startEl.value = '2025-07';
-        if (endEl && !endEl.value) endEl.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-        if (applyBtn) applyBtn.addEventListener('click', () => {
-            this.updateStatisticsOverview();
-            this.updateMonthlyChart();
-            this.updatePerformanceTable();
-        });
     }
 
     populateYearFilter() {
@@ -4716,27 +4706,16 @@ this.saveLots();
     }
 
     updateStatisticsOverview() {
-        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
-        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
+        const selectedYear = document.getElementById('statsYearFilter').value;
         let filteredPayments = this.payments;
         let filteredMembers = this.members;
 
-        let startDate = null;
-        let endDate = null;
-        if (startVal) startDate = new Date(startVal + '-01');
-        if (endVal) {
-            const tmp = new Date(endVal + '-01');
-            endDate = new Date(tmp.getFullYear(), tmp.getMonth() + 1, 0); // last day of month
-        }
-
-        if (startDate && endDate) {
+        if (selectedYear) {
             filteredPayments = this.payments.filter(payment => {
-                const d = new Date(payment.date);
-                return d >= startDate && d <= endDate;
+                return new Date(payment.date).getFullYear() == selectedYear;
             });
             filteredMembers = this.members.filter(member => {
-                const d = new Date(member.createdAt || new Date());
-                return d >= startDate && d <= endDate;
+                return new Date(member.createdAt || new Date()).getFullYear() == selectedYear;
             });
         }
 
@@ -4751,56 +4730,41 @@ this.saveLots();
     }
 
     updateMonthlyChart() {
-        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
-        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
+        const selectedYear = document.getElementById('statsYearFilter').value || new Date().getFullYear();
         const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
         const chartContainer = document.getElementById('monthlyChart');
         chartContainer.innerHTML = '';
 
-        // build months range
-        let months = [];
-        if (startVal && endVal) {
-            let cur = new Date(startVal + '-01');
-            const endDate = new Date(endVal + '-01');
-            while (cur <= endDate) {
-                months.push({ year: cur.getFullYear(), month: cur.getMonth() });
-                cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-            }
-        } else {
-            // default: current year full 12 months
-            const y = new Date().getFullYear();
-            for (let m = 0; m < 12; m++) months.push({ year: y, month: m });
-        }
-
-        // initialize monthly data map keyed by YYYY-MM
         const monthlyData = {};
-        months.forEach(m => {
-            const key = `${m.year}-${String(m.month+1).padStart(2,'0')}`;
-            monthlyData[key] = { payments: 0, amount: 0, newMembers: 0, label: `${monthNames[m.month]} ${m.year}` };
-        });
+
+        for (let i = 0; i < 12; i++) {
+            monthlyData[i] = { payments: 0, amount: 0, newMembers: 0 };
+        }
 
         this.payments.forEach(payment => {
             const paymentDate = new Date(payment.date);
-            const key = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth()+1).padStart(2,'0')}`;
-            if (monthlyData[key]) {
-                monthlyData[key].payments++;
-                monthlyData[key].amount += payment.amount || 0;
+            if (paymentDate.getFullYear() == selectedYear) {
+                const month = paymentDate.getMonth();
+                monthlyData[month].payments++;
+                monthlyData[month].amount += payment.amount;
             }
         });
 
         this.members.forEach(member => {
             const memberDate = new Date(member.createdAt || new Date());
-            const key = `${memberDate.getFullYear()}-${String(memberDate.getMonth()+1).padStart(2,'0')}`;
-            if (monthlyData[key]) monthlyData[key].newMembers++;
+            if (memberDate.getFullYear() == selectedYear) {
+                const month = memberDate.getMonth();
+                monthlyData[month].newMembers++;
+            }
         });
 
-        const values = Object.values(monthlyData);
-        const maxPayments = Math.max(...values.map(m => m.payments), 0);
-        const maxMembers = Math.max(...values.map(m => m.newMembers), 0);
-        const maxValue = Math.max(maxPayments, maxMembers, 1);
+        const maxPayments = Math.max(...Object.values(monthlyData).map(m => m.payments));
+        const maxMembers = Math.max(...Object.values(monthlyData).map(m => m.newMembers));
+        const maxValue = Math.max(maxPayments, maxMembers);
 
-        values.forEach(data => {
+        for (let i = 0; i < 12; i++) {
+            const data = monthlyData[i];
             const paymentHeight = maxValue > 0 ? (data.payments / maxValue) * 180 : 0;
             const memberHeight = maxValue > 0 ? (data.newMembers / maxValue) * 180 : 0;
 
@@ -4813,10 +4777,10 @@ this.saveLots();
                 <div class="chart-bar-container">
                     <div class="chart-bar-fill secondary" style="height: ${memberHeight}px;" title="Nouveaux membres: ${data.newMembers}"></div>
                 </div>
-                <div class="chart-bar-label">${data.label}</div>
+                <div class="chart-bar-label">${monthNames[i]}</div>
             `;
             chartContainer.appendChild(barContainer);
-        });
+        }
     }
 
 formatCurrencyForPDF(amount) {
@@ -4849,53 +4813,37 @@ getIconDataURL(iconClass, color = '#2C3E50', size = 16) {
 }
 
     updatePerformanceTable() {
-        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
-        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
-        const selectedYear = null; // unused when range is set below
+        const selectedYear = document.getElementById('statsYearFilter').value || new Date().getFullYear();
         const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
         const tableBody = document.getElementById('performanceTableBody');
         tableBody.innerHTML = '';
 
-        // build months range (default current year)
-        let months = [];
-        if (startVal && endVal) {
-            let cur = new Date(startVal + '-01');
-            const endDate = new Date(endVal + '-01');
-            while (cur <= endDate) {
-                months.push({ year: cur.getFullYear(), month: cur.getMonth() });
-                cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-            }
-        } else {
-            const y = new Date().getFullYear();
-            for (let m = 0; m < 12; m++) months.push({ year: y, month: m });
-        }
-
         const monthlyData = {};
-        months.forEach(m => monthlyData[m.month] = { payments: 0, amount: 0, newMembers: 0, label: `${m.month+1}/${m.year}` });
+
+        for (let i = 0; i < 12; i++) {
+            monthlyData[i] = { payments: 0, amount: 0, newMembers: 0 };
+        }
 
         this.payments.forEach(payment => {
             const paymentDate = new Date(payment.date);
-            months.forEach((m, idx) => {
-                if (paymentDate.getFullYear() === m.year && paymentDate.getMonth() === m.month) {
-                    monthlyData[m.month].payments++;
-                    monthlyData[m.month].amount += payment.amount || 0;
-                }
-            });
+            if (paymentDate.getFullYear() == selectedYear) {
+                const month = paymentDate.getMonth();
+                monthlyData[month].payments++;
+                monthlyData[month].amount += payment.amount;
+            }
         });
 
         this.members.forEach(member => {
             const memberDate = new Date(member.createdAt || new Date());
-            months.forEach(m => {
-                if (memberDate.getFullYear() === m.year && memberDate.getMonth() === m.month) {
-                    monthlyData[m.month].newMembers++;
-                }
-            });
+            if (memberDate.getFullYear() == selectedYear) {
+                const month = memberDate.getMonth();
+                monthlyData[month].newMembers++;
+            }
         });
 
-        for (let i = 0; i < months.length; i++) {
-            const m = months[i];
-            const data = monthlyData[m.month];
+        for (let i = 0; i < 12; i++) {
+            const data = monthlyData[i];
             const completionRate = this.members.length > 0 ? Math.round((data.payments / this.members.length) * 100) : 0;
 
             let performanceBadge = '';
@@ -4909,7 +4857,7 @@ getIconDataURL(iconClass, color = '#2C3E50', size = 16) {
 
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${monthNames[m.month]}</td>
+                <td>${monthNames[i]}</td>
                 <td>${data.payments}</td>
                 <td>${this.formatCurrency(data.amount)}</td>
                 <td>${data.newMembers}</td>
@@ -4920,10 +4868,8 @@ getIconDataURL(iconClass, color = '#2C3E50', size = 16) {
     }
 
     exportStatist() {
-        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
-        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
-        const label = startVal && endVal ? `${startVal} → ${endVal}` : 'période sélectionnée';
-        this.showToast(`Export des statistiques ${label} terminé!`, 'success');
+        const selectedYear = document.getElementById('statsYearFilter').value || new Date().getFullYear();
+        this.showToast(`Export des statistiques ${selectedYear} terminé!`, 'success');
     }
 
 printReceipt(paymentId) {
