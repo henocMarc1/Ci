@@ -9,7 +9,7 @@
     --mobile-padding: 16px;
     --mobile-card-radius: 12px;
     --mobile-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    --primary-gradient: linear-gradient(135deg, #6366F1, #8B5CF6);
+    --primary-gradient: linear-gradient(135deg, var(--pill-color), var(--pill-color));
 }
 
 /* Reset et base mobile */
@@ -374,7 +374,7 @@
     }
 
     .summary-card.success .summary-icon {
-        background: #27AE60;
+        background: var(--secondary);
     }
 
     .summary-card.primary .summary-icon {

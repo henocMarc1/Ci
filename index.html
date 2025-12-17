@@ -44,8 +44,8 @@ firebase.auth().onAuthStateChanged(function(user) {
     console.log('Utilisateur connecté:', user.email);
     
     function initApp() {
-      const userNameEl = document.getElementById('userName');
-      const userAvatarEl = document.getElementById('userAvatar');
+    const userNameEl = document.getElementById('userName');
+    const userAvatarEl = document.getElementById('userAvatar');
       if (userNameEl && user.displayName) {
         userNameEl.textContent = user.displayName;
       } else if (userNameEl) {
@@ -57,6 +57,7 @@ firebase.auth().onAuthStateChanged(function(user) {
       } else if (userAvatarEl && user.email) {
         userAvatarEl.textContent = user.email.substring(0, 2).toUpperCase();
       }
+            // pill email removed; no UI update required here
       
       const logoutBtn = document.getElementById('logoutBtn');
       if (logoutBtn) {
@@ -69,9 +70,16 @@ firebase.auth().onAuthStateChanged(function(user) {
         });
       }
       
-      if (typeof PaymentManager !== 'undefined' && !window.paymentManager) {
-        window.paymentManager = new PaymentManager();
-      }
+            try {
+                const isNative = typeof PaymentManager === 'function' && /\[native code\]/.test(Function.prototype.toString.call(PaymentManager));
+                if (typeof PaymentManager !== 'undefined' && !isNative && !window.paymentManager) {
+                    window.paymentManager = new PaymentManager();
+                    // backward-compat alias: some inline onclick handlers use `app`
+                    window.app = window.paymentManager;
+                }
+            } catch (e) {
+                console.warn('PaymentManager not instantiated here (native or unavailable). Will initialize later from script.js.', e);
+            }
     }
     
     if (document.readyState === 'loading') {
@@ -102,37 +110,30 @@ firebase.auth().onAuthStateChanged(function(user) {
   <span class="mobile-menu-icon">☰</span>
 </button>
 
-            <div class="logo">
-    <img src="logo.jpeg" style="height: 40px; width: 40px; border-radius: 50%;" />  
-                <span class="logo-text">CI Habitat GESTION</span>
-            </div>
+            <!-- logo removed (now inside pill navbar) -->
         </div>
         
-        <nav class="header-nav">
-            <button class="nav-tab active" data-tab="dashboard">
-    <img src="gauge-high-solid-full.svg" style="height: 25px; width: 40px; border-radius: 50%;" />  
-                Tableau de bord
-            </button>
-            <button class="nav-tab" data-tab="members">
-                <i class="fas fa-users"></i>
-                Membres
-            </button>
-            <button class="nav-tab" data-tab="lots">
-                <i class="fas fa-cog"></i>
-                Gestion des Lots
-            </button>
-            <button class="nav-tab" data-tab="payments">
-                <i class="fas fa-credit-card"></i>
-                Gestion des Paiements
-            </button>
-            <button class="nav-tab" data-tab="statistics">
-                <i class="fas fa-chart-line"></i>
-                Statistiques
-            </button>
-            <button class="nav-tab" data-tab="notifications">
-                <i class="fas fa-bell"></i>
-                Notifications
-            </button>
+        <nav class="pill-navbar custom-pill-navbar" aria-label="Main navigation">
+            <div class="pill-inner">
+                <div class="pill-left">
+                    <div class="pill-icon">
+                        <img src="logo.jpeg" alt="logo" />
+                    </div>
+                </div>
+
+                <div class="pill-center">
+                    <button class="nav-tab pill-link active" data-tab="dashboard"><i class="fas fa-chart-pie"></i> Tableau de bord</button>
+                    <button class="nav-tab pill-link" data-tab="members"><i class="fas fa-users"></i> Membres</button>
+                    <button class="nav-tab pill-link" data-tab="lots"><i class="fas fa-home"></i> Gestion des Lots</button>
+                    <button class="nav-tab pill-link" data-tab="payments"><i class="fas fa-credit-card"></i> Paiements</button>
+                    <button class="nav-tab pill-link" data-tab="statistics"><i class="fas fa-chart-line"></i> Statistiques</button>
+                    
+                </div>
+
+                <div class="pill-right">
+                    <!-- email/pill removed as requested -->
+                </div>
+            </div>
         </nav>
         
         <div class="header-right" style="display: flex; align-items: center; gap: 12px; z-index: 100;">
@@ -142,7 +143,7 @@ firebase.auth().onAuthStateChanged(function(user) {
                 <span class="user-name" id="userName">Utilisateur</span>
             </div>
             <button class="btn btn-secondary" id="logoutBtn" style="margin-left: 12px;">
-                <i class="fas fa-sign-out-alt"></i> Déconnexion
+                <i class="fas fa-sign-out-alt"></i>
             </button>
         </div>
     </div>
@@ -151,7 +152,7 @@ firebase.auth().onAuthStateChanged(function(user) {
         <!-- Bouton de notifications flottant -->
         <div class="notifications-wrapper-fixed" style="position: fixed; bottom: 30px; right: 30px; z-index: 9999;">
             <button class="notifications-btn-fixed" id="notificationsBtn" aria-label="Notifications" 
-                style="position: relative; background: linear-gradient(135deg, #6366F1, #8B5CF6); border: none; color: white; padding: 0; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 60px; height: 60px; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.6);">
+                style="position: relative; background: var(--pill-color); border: none; color: white; padding: 0; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 60px; height: 60px; box-shadow: 0 4px 20px rgba(24,24,24,0.6);">
                 <i class="fas fa-bell" style="font-size: 26px;"></i>
                 <span class="notifications-badge" id="notificationsBadge" 
                     style="display: none; position: absolute; top: -5px; right: -5px; background: #dc3545; color: white; border-radius: 50%; min-width: 24px; height: 24px; font-size: 12px; font-weight: 700; align-items: center; justify-content: center; padding: 0 6px; border: 3px solid white; box-shadow: 0 2px 8px rgba(220, 53, 69, 0.5);">0</span>
@@ -184,14 +185,12 @@ firebase.auth().onAuthStateChanged(function(user) {
                 <div class="stat-icon"><i class="fas fa-users"></i></div>
                 <div class="stat-info">
                     <span class="stat-number" id="totalMembers">0</span>
-                    <span class="stat-text">Membres Actifs</span>
                 </div>
             </div>
             <div class="hero-stat-card">
                 <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
                 <div class="stat-info">
                     <span class="stat-number" id="totalPayments">0 FCFA</span>
-                    <span class="stat-text">Ce Mois</span>
                 </div>
             </div>
         </div>
@@ -211,10 +210,7 @@ firebase.auth().onAuthStateChanged(function(user) {
             <i class="fas fa-download"></i>
             <span>Exporter les Données</span>
         </button>
-        <button class="quick-action-btn info" id="toggleTheme">
-            <i class="fas fa-moon"></i>
-            <span>Mode Sombre</span>
-        </button>
+        <!-- Dark mode toggle removed -->
     </div>
 
     <div class="dashboard-grid">
@@ -479,6 +475,16 @@ firebase.auth().onAuthStateChanged(function(user) {
                         </div>
                         <button class="btn btn-secondary" id="toggleCondensedMembers">Mode condensé : OFF</button>
                         <button class="btn btn-primary" id="addMemberBtn">Ajouter Membre</button>
+                        <button class="btn btn-secondary" id="bulkImportMembersBtn" style="margin-left:8px;">Importer Membres</button>
+                        <div id="membersBulkActions" style="display:flex;align-items:center;gap:8px;margin-left:8px;">
+                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;">
+                                <input type="checkbox" id="selectAllMembersGlobal"> Tout sélectionner
+                            </label>
+                            <button class="btn btn-secondary" id="bulkExportSelected">Exporter</button>
+                            <button class="btn btn-danger" id="bulkDeleteSelected">Supprimer</button>
+                            <button class="btn btn-primary" id="bulkMarkPaidSelected">Marquer payé</button>
+                            <button class="btn btn-secondary" id="bulkMarkSoldSelected">Marquer soldé</button>
+                        </div>
                     </div>
                 </div>
                 
@@ -529,6 +535,13 @@ firebase.auth().onAuthStateChanged(function(user) {
                         <select id="monthFilter" class="filter-select">
                             <option value="">Tous les Mois</option>
                         </select>
+                        <label style="display:flex;align-items:center;gap:8px;margin-left:8px;">
+                            <input type="month" id="paymentStartMonth" style="padding:6px;border-radius:6px;border:1px solid #e6e9ef"> 
+                            <span style="font-size:13px;color:#6b7280">→</span>
+                            <input type="month" id="paymentEndMonth" style="padding:6px;border-radius:6px;border:1px solid #e6e9ef">
+                        </label>
+                        <button class="btn btn-tertiary" id="applyPaymentsRange" style="margin-left:8px;padding:8px 10px;">Appliquer</button>
+                        <button class="btn btn-secondary" id="resetPaymentsRange" style="margin-left:6px;padding:8px 10px;">Réinitialiser</button>
                         <select id="memberFilter" class="filter-select">
                             <option value="">Tous les Membres</option>
                         </select>
@@ -559,13 +572,7 @@ firebase.auth().onAuthStateChanged(function(user) {
                             <h3><i class="fas fa-tag"></i> Prix Unitaire du Lot</h3>
                         </div>
                         <div class="card-body">
-                            <div class="price-display" id="lotPriceDisplay">
-                                <span class="price-label">Prix par lot :</span>
-                                <span class="price-value" id="currentLotPrice">0 FCFA</span>
-                            </div>
-                            <button class="btn btn-primary" id="editLotPriceBtn">
-                                <i class="fas fa-edit"></i> Modifier le Prix
-                            </button>
+                           
                             <div style="height:12px"></div>
                             <div class="price-display" id="unitPriceDisplay" style="margin-top:10px;">
                                 <span class="price-label">Prix unitaire global :</span>
@@ -650,10 +657,12 @@ firebase.auth().onAuthStateChanged(function(user) {
                 <div class="tab-header">
                     <h2 class="tab-title">Statistiques</h2>
                     <div class="stats-controls">
-                        <select id="statsYearFilter" class="filter-select">
-                            <option value="">Année</option>
-                        </select>
-<button id="exportStatsBtn" class="btn btn-primary">Exporter</button>
+                        <div class="stats-date-range">
+                            <input type="month" id="statsStartDate" class="filter-select" aria-label="Date de début">
+                            <input type="month" id="statsEndDate" class="filter-select" aria-label="Date de fin">
+                            <button id="applyStatsFilter" class="btn btn-primary">Appliquer</button>
+                        </div>
+                        <button id="exportStatsBtn" class="btn btn-primary">Exporter</button>
                     </div>
                 </div>
 

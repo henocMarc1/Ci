@@ -12,6 +12,8 @@ class PaymentManager {
 this.members = [];
 this.payments = [];
 this.lots = [];
+    const storedSelected = localStorage.getItem('selectedMembers');
+    this.selectedMembers = storedSelected ? new Set(JSON.parse(storedSelected).map(String)) : new Set();
     this.config = {};
         this.currentTab = 'dashboard';
         this.currentMonth = new Date().getMonth();
@@ -86,15 +88,15 @@ getSvgIcon(name, size = 20) {
         case 'wallet':
             return `<svg ${common}><rect x="2" y="6" width="20" height="12" rx="2" stroke="#27AE60" stroke-width="1.2" fill="#fff"/><circle cx="18" cy="12" r="1.6" fill="#27AE60"/></svg>`;
         case 'bullseye':
-            return `<svg ${common}><circle cx="12" cy="12" r="9" stroke="#6366F1" stroke-width="1.2" fill="none"/><circle cx="12" cy="12" r="5" stroke="#8B5CF6" stroke-width="1.2" fill="none"/></svg>`;
+            return `<svg ${common}><circle cx="12" cy="12" r="9" stroke="#181818" stroke-width="1.2" fill="none"/><circle cx="12" cy="12" r="5" stroke="#181818" stroke-width="1.2" fill="none"/></svg>`;
         case 'percentage':
             return `<svg ${common}><path d="M4 4L20 20" stroke="#F39C12" stroke-width="1.6"/><circle cx="7.5" cy="7.5" r="1.8" fill="#F39C12"/><circle cx="16.5" cy="16.5" r="1.8" fill="#F39C12"/></svg>`;
         case 'home':
-            return `<svg ${common}><path d="M3 11L12 4L21 11" stroke="#8B5CF6" stroke-width="1.2" fill="none"/><rect x="6" y="11" width="12" height="8" rx="1" stroke="#6366F1" stroke-width="1.2" fill="#fff"/></svg>`;
+            return `<svg ${common}><path d="M3 11L12 4L21 11" stroke="#181818" stroke-width="1.2" fill="none"/><rect x="6" y="11" width="12" height="8" rx="1" stroke="#181818" stroke-width="1.2" fill="#fff"/></svg>`;
         case 'table':
             return `<svg ${common}><rect x="3" y="4" width="18" height="16" rx="1" stroke="#2C3E50" stroke-width="1.2" fill="#fff"/><path d="M3 10h18M10 4v16" stroke="#2C3E50" stroke-width="1"/></svg>`;
         case 'chart-bar':
-            return `<svg ${common}><rect x="4" y="10" width="3" height="10" rx="0.5" fill="#27AE60"/><rect x="10.5" y="6" width="3" height="14" rx="0.5" fill="#6366F1"/><rect x="17" y="3" width="3" height="17" rx="0.5" fill="#F39C12"/></svg>`;
+            return `<svg ${common}><rect x="4" y="10" width="3" height="10" rx="0.5" fill="#27AE60"/><rect x="10.5" y="6" width="3" height="14" rx="0.5" fill="#181818"/><rect x="17" y="3" width="3" height="17" rx="0.5" fill="#F39C12"/></svg>`;
         case 'users':
             return `<svg ${common}><circle cx="9" cy="8" r="2.2" fill="#2C3E50"/><path d="M4 18c1.5-4 7-4 8 0" stroke="#2C3E50" stroke-width="1.2" fill="none"/><circle cx="17" cy="8" r="1.8" fill="#5D6D7E"/></svg>`;
         default:
@@ -931,41 +933,36 @@ document.querySelectorAll('.modal-tab').forEach(tab => {
                 if (saveBtn) saveBtn.addEventListener('click', handleSave);
             });
         }
-       document.getElementById('exportPDF').addEventListener('click', () => {
-    this.generateStyledMonthlyReport();
-});
-        document.getElementById('exportPaymentsPDF').addEventListener('click', () => {
-            this.exportPaymentsToPDF();
-        });
-        document.getElementById('viewAllPayments').addEventListener('click', () => {
-            this.switchTab('payments');
-        });
-        document.getElementById('exportStatsBtn').addEventListener('click', () => {
-            this.exportStatistics();
-        });
-        document.getElementById('statsYearFilter').addEventListener('change', () => {
-            this.updateStatistics();
-        });
+        const exportPDFBtn = document.getElementById('exportPDF');
+        if (exportPDFBtn) exportPDFBtn.addEventListener('click', () => { this.generateStyledMonthlyReport(); });
 
-        document.getElementById('modalClose').addEventListener('click', () => {
-            this.closeModal();
-        });
+        const exportPaymentsPDFBtn = document.getElementById('exportPaymentsPDF');
+        if (exportPaymentsPDFBtn) exportPaymentsPDFBtn.addEventListener('click', () => { this.exportPaymentsToPDF(); });
+
+        const viewAllPaymentsBtn = document.getElementById('viewAllPayments');
+        if (viewAllPaymentsBtn) viewAllPaymentsBtn.addEventListener('click', () => { this.switchTab('payments'); });
+
+        const exportStatsBtn = document.getElementById('exportStatsBtn');
+        if (exportStatsBtn) exportStatsBtn.addEventListener('click', () => { this.exportStatistics(); });
+
+        const statsYearFilter = document.getElementById('statsYearFilter');
+        if (statsYearFilter) statsYearFilter.addEventListener('change', () => { this.updateStatistics(); });
+
+        const modalCloseBtn = document.getElementById('modalClose');
+        if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => { this.closeModal(); });
+
         // Clic sur l'overlay désactivé pour éviter fermeture accidentelle
-        // document.getElementById('modalOverlay').addEventListener('click', (e) => {
-        //     if (e.target === e.currentTarget) {
-        //         this.closeModal();
-        //     }
-        // });
+        // const modalOverlayEl = document.getElementById('modalOverlay');
+        // if (modalOverlayEl) modalOverlayEl.addEventListener('click', (e) => { if (e.target === e.currentTarget) this.closeModal(); });
 
-        document.getElementById('memberSearch').addEventListener('input', () => {
-            this.renderMembers();
-        });
-        document.getElementById('memberStatusFilter').addEventListener('change', () => {
-            this.renderMembers();
-        });
-        document.getElementById('memberUnpaidMonthsFilter').addEventListener('change', () => {
-            this.renderMembers();
-        });
+        const memberSearchEl = document.getElementById('memberSearch');
+        if (memberSearchEl) memberSearchEl.addEventListener('input', () => { this.renderMembers(); });
+
+        const memberStatusFilterEl = document.getElementById('memberStatusFilter');
+        if (memberStatusFilterEl) memberStatusFilterEl.addEventListener('change', () => { this.renderMembers(); });
+
+        const memberUnpaidMonthsFilterEl = document.getElementById('memberUnpaidMonthsFilter');
+        if (memberUnpaidMonthsFilterEl) memberUnpaidMonthsFilterEl.addEventListener('change', () => { this.renderMembers(); });
 
         const condensedBtn = document.getElementById('toggleCondensedMembers');
         if (condensedBtn) {
@@ -982,6 +979,78 @@ document.querySelectorAll('.modal-tab').forEach(tab => {
             });
         }
 
+        // Global select-all and bulk actions (header toolbar)
+        const selectAllGlobal = document.getElementById('selectAllMembersGlobal');
+        if (selectAllGlobal) {
+            selectAllGlobal.addEventListener('change', () => {
+                const membersGrid = document.getElementById('membersGrid');
+                const checkboxes = membersGrid ? membersGrid.querySelectorAll('.member-select-checkbox, .member-select') : [];
+                if (selectAllGlobal.checked) {
+                    checkboxes.forEach(cb => cb.checked = true);
+                    document.querySelectorAll('[data-member-id]').forEach(el => {
+                        const id = el.dataset.memberId;
+                        if (id) this.selectedMembers.add(id);
+                    });
+                } else {
+                    checkboxes.forEach(cb => cb.checked = false);
+                    this.selectedMembers.clear();
+                }
+                localStorage.setItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+                const bulkActions = document.getElementById('membersBulkActions');
+                if (bulkActions) bulkActions.style.display = this.selectedMembers.size > 0 ? 'flex' : 'none';
+                // Re-render list view to update selection UI
+                this.renderMembers();
+            });
+        }
+
+        const bulkExportSelected = document.getElementById('bulkExportSelected');
+        if (bulkExportSelected) bulkExportSelected.addEventListener('click', () => {
+            if (this.selectedMembers.size === 0) return this.showNotification('Aucun membre sélectionné', 'error');
+            this.selectedMembers.forEach(id => this.generateMemberDetailedReport(id));
+        });
+
+        const bulkDeleteSelected = document.getElementById('bulkDeleteSelected');
+        if (bulkDeleteSelected) bulkDeleteSelected.addEventListener('click', () => {
+            if (this.selectedMembers.size === 0) return this.showNotification('Aucun membre sélectionné', 'error');
+            if (!confirm('Supprimer les membres sélectionnés ?')) return;
+            this.selectedMembers.forEach(id => this.deleteMember(id));
+            this.selectedMembers.clear();
+            localStorage.setItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+            this.renderMembers();
+        });
+
+        const bulkMarkPaidSelected = document.getElementById('bulkMarkPaidSelected');
+        if (bulkMarkPaidSelected) bulkMarkPaidSelected.addEventListener('click', () => {
+            if (this.selectedMembers.size === 0) return this.showNotification('Aucun membre sélectionné', 'error');
+            // Marking paid: create a payment for current month for each selected member
+            const now = new Date();
+            const monthKey = `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
+            this.selectedMembers.forEach(id => {
+                const amount = this.getUnitPrice();
+                const payment = { id: this.generateId(), memberId: id, amount, date: new Date().toISOString(), monthKey };
+                this.payments.push(payment);
+            });
+            this.savePayments();
+            this.showNotification('Paiements ajoutés pour les membres sélectionnés', 'success');
+            this.selectedMembers.clear();
+            localStorage.setItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+            this.renderMembers();
+        });
+
+        const bulkMarkSoldSelected = document.getElementById('bulkMarkSoldSelected');
+        if (bulkMarkSoldSelected) bulkMarkSoldSelected.addEventListener('click', () => {
+            if (this.selectedMembers.size === 0) return this.showNotification('Aucun membre sélectionné', 'error');
+            this.selectedMembers.forEach(id => {
+                const member = this.members.find(m => m.id === id);
+                if (member) member.sold = true;
+            });
+            this.saveMembers();
+            this.showNotification('Membres marqués soldés', 'success');
+            this.selectedMembers.clear();
+            localStorage.setItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+            this.renderMembers();
+        });
+
         document.getElementById('paymentSearch').addEventListener('input', () => {
             this.renderPayments();
         });
@@ -990,6 +1059,32 @@ document.querySelectorAll('.modal-tab').forEach(tab => {
             this.renderPayments();
         });
         document.getElementById('memberFilter').addEventListener('change', () => {
+            this.renderPayments();
+        });
+
+        // Payments range filter (start/end month) - Apply / Reset
+        const applyRangeBtn = document.getElementById('applyPaymentsRange');
+        const resetRangeBtn = document.getElementById('resetPaymentsRange');
+        const startEl = document.getElementById('paymentStartMonth');
+        const endEl = document.getElementById('paymentEndMonth');
+        if (applyRangeBtn) applyRangeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const start = startEl && startEl.value ? startEl.value : null;
+            const end = endEl && endEl.value ? endEl.value : null;
+            if (start && end) {
+                const [sy, sm] = start.split('-').map(s=>parseInt(s,10));
+                const [ey, em] = end.split('-').map(s=>parseInt(s,10));
+                const monthsDiff = (ey - sy) * 12 + (em - sm) + 1;
+                if (monthsDiff <= 0) { this.showNotification('La date de fin doit être après la date de début', 'error'); return; }
+                if (monthsDiff > 12) { this.showNotification('La période ne peut pas dépasser 12 mois', 'error'); return; }
+            }
+            // re-render with applied range
+            this.renderPayments();
+        });
+        if (resetRangeBtn) resetRangeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (startEl) startEl.value = '';
+            if (endEl) endEl.value = '';
             this.renderPayments();
         });
 
@@ -1244,7 +1339,7 @@ actions.push({
         }
 
         const sortedMembers = this.applyMemberSort([...filteredMembers]);
-        const allVisibleSelected = sortedMembers.every(m => this.selectedMembers.has(m.id));
+        const allVisibleSelected = sortedMembers.every(m => this.selectedMembers.has(String(m.id)));
 
         // Générer les 12 mois en commençant par juillet
         const months = [];
@@ -1348,7 +1443,7 @@ actions.push({
             const status = remaining <= 0 ? 'SOLDE' : 'NON-SOLDE';
             const statusColor = remaining <= 0 ? '#27AE60' : '#E74C3C';
             
-            const isSelected = this.selectedMembers.has(member.id);
+            const isSelected = this.selectedMembers.has(String(member.id));
             const lotsCount = member.numberOfLots || 1;
             
             // Calculer le nombre de mois impayés
@@ -1397,7 +1492,7 @@ actions.push({
             html += `
                 <tr class="member-row" data-member-id="${member.id}">
                     <td class="cell-select"><input type="checkbox" class="member-select" data-member-id="${member.id}" ${isSelected ? 'checked' : ''}></td>
-                    <td class="cell-name member-name-clickable" style="font-weight: 600; cursor: pointer; color: #6366F1;" data-member-id="${member.id}" title="Cliquez pour voir les détails">
+                    <td class="cell-name member-name-clickable" style="font-weight: 600; cursor: pointer; color: #181818;" data-member-id="${member.id}" title="Cliquez pour voir les détails">
                         ${showBell ? `<i class="fas fa-bell" style="color: #E74C3C; margin-right: 5px;" title="${unpaidMonthsCount} mois impayé${unpaidMonthsCount > 1 ? 's' : ''}"></i>` : ''}
                         ${member.name}
                     </td>
@@ -1506,9 +1601,9 @@ actions.push({
         if (selectAll) {
             selectAll.addEventListener('change', () => {
                 if (selectAll.checked) {
-                    sortedMembers.forEach(m => this.selectedMembers.add(m.id));
+                    sortedMembers.forEach(m => this.selectedMembers.add(String(m.id)));
                 } else {
-                    sortedMembers.forEach(m => this.selectedMembers.delete(m.id));
+                    sortedMembers.forEach(m => this.selectedMembers.delete(String(m.id)));
                 }
                 updateStoredSelection();
                 this.renderMembersListView(filteredMembers);
@@ -1615,9 +1710,9 @@ actions.push({
 
         if (searchTerm) {
             filteredMembers = filteredMembers.filter(member =>
-                member.name.toLowerCase().includes(searchTerm) ||
-                member.email.toLowerCase().includes(searchTerm) ||
-                member.phone.includes(searchTerm)
+                (member.name || '').toLowerCase().includes(searchTerm) ||
+                (member.email || '').toLowerCase().includes(searchTerm) ||
+                (member.phone || '').includes(searchTerm)
             );
         }
 
@@ -1709,13 +1804,9 @@ actions.push({
                 const daysRemaining = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
                 
                 if (daysRemaining < 0) {
-                    endDateWarning = `<div style="background: #dc3545; color: white; padding: 8px; border-radius: 6px; margin-top: 8px; font-size: 0.85em;">
-                        ⚠️ Échéance dépassée de ${Math.abs(daysRemaining)} jours
-                    </div>`;
+                    endDateWarning = `<div style="background: #dc3545; color: white; padding: 8px; border-radius: 6px; margin-top: 8px; font-size: 0.85em;">Échéance dépassée de ${Math.abs(daysRemaining)} jours</div>`;
                 } else if (daysRemaining <= 30) {
-                    endDateWarning = `<div style="background: #ffc107; color: #000; padding: 8px; border-radius: 6px; margin-top: 8px; font-size: 0.85em;">
-                        ⏰ Plus que ${daysRemaining} jours restants
-                    </div>`;
+                    endDateWarning = `<div style="background: #ffc107; color: #000; padding: 8px; border-radius: 6px; margin-top: 8px; font-size: 0.85em;">Plus que ${daysRemaining} jours restants</div>`;
                 }
             }
 
@@ -1735,6 +1826,9 @@ actions.push({
             return `
                 <div class="member-card">
                     <div class="member-header">
+                        <div style="display:flex;align-items:center;margin-right:10px;">
+                            <input type="checkbox" class="member-select-checkbox" data-member-id="${member.id}" ${this.selectedMembers.has(String(member.id)) ? 'checked' : ''}>
+                        </div>
                         <div class="member-info">
                             <div class="member-avatar">
                                 ${member.name.charAt(0).toUpperCase()}
@@ -1763,8 +1857,8 @@ actions.push({
                         <div class="payment-duration">Durée: ${member.paymentDuration || 12} mois</div>
                         ${member.startDate && member.endDate ? `
                             <div class="payment-dates" style="margin-top: 8px; font-size: 0.85em; color: #666;">
-                                <div>📅 Début: ${this.formatDate(member.startDate)}</div>
-                                <div>🏁 Fin: ${this.formatDate(member.endDate)}</div>
+                                <div>Début: ${this.formatDate(member.startDate)}</div>
+                                <div>Fin: ${this.formatDate(member.endDate)}</div>
                             </div>
                         ` : ''}
                         ${endDateWarning}
@@ -1799,7 +1893,30 @@ actions.push({
                     this.generateMemberDetailedReport(memberId);
                 });
             });
+
+            // Checkbox handlers for card view
+            const updateStoredSelection = () => {
+                localStorage.setItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+                const bulkActions = document.getElementById('membersBulkActions');
+                if (bulkActions) bulkActions.style.display = this.selectedMembers.size > 0 ? 'flex' : 'none';
+                const selectAllGlobal = document.getElementById('selectAllMembersGlobal');
+                if (selectAllGlobal) selectAllGlobal.checked = false;
+            };
+
+            document.querySelectorAll('.member-select-checkbox').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const id = cb.dataset.memberId;
+                    if (cb.checked) this.selectedMembers.add(id); else this.selectedMembers.delete(id);
+                    updateStoredSelection();
+                    // re-render list to update counters / states
+                    // If in list-view, the list renderer manages its own selection UI
+                });
+            });
         }, 100);
+        const bulkActions = document.getElementById('membersBulkActions');
+        if (bulkActions) bulkActions.style.display = this.selectedMembers.size > 0 ? 'flex' : 'none';
+        const selectAllGlobal = document.getElementById('selectAllMembersGlobal');
+        if (selectAllGlobal) selectAllGlobal.checked = false;
     }
 
     applyMemberSort(members) {
@@ -1947,10 +2064,10 @@ actions.push({
     getMemberComplianceStatus(member, totalPaid, expectedTotal) {
         if (expectedTotal === 0) return { status: 'complété', color: '#27AE60', label: 'Complété' };
         const progress = (totalPaid / expectedTotal) * 100;
-        if (progress >= 100) return { status: 'complété', color: '#27AE60', label: '✅ Complété' };
-        if (progress >= 80) return { status: 'en-règle', color: '#3498DB', label: '✅ En règle' };
-        if (progress >= 50) return { status: 'partiel', color: '#F39C12', label: '⚠️ Partiel' };
-        return { status: 'risque', color: '#E74C3C', label: '❌ À risque' };
+        if (progress >= 100) return { status: 'complété', color: '#27AE60', label: 'Complété' };
+        if (progress >= 80) return { status: 'en-règle', color: '#3498DB', label: 'En règle' };
+        if (progress >= 50) return { status: 'partiel', color: '#F39C12', label: 'Partiel' };
+        return { status: 'risque', color: '#E74C3C', label: 'À risque' };
     }
 
     // Générer frise temporelle paiements par mois
@@ -2208,7 +2325,7 @@ actions.push({
                 <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #E0E6ED; text-align: center; color: #5D6D7E; font-size: 12px;">
                     <p style="margin: 5px 0;"><i class="fas fa-phone-alt" style="margin-right: 5px;"></i>Contact: 01 618 837 90</p>
                     <p style="margin: 5px 0;">Document généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
-                    <p style="margin: 15px 0 0 0; font-weight: bold; color: #6366F1;">CI Habitat - L'immobilier Autrement</p>
+                    <p style="margin: 15px 0 0 0; font-weight: bold; color: #181818;">CI Habitat - L'immobilier Autrement</p>
                 </div>
             </div>
         `;
@@ -2272,15 +2389,15 @@ getSvgIcon(name, size = 20) {
         case 'wallet':
             return `<svg ${common}><rect x="2" y="6" width="20" height="12" rx="2" stroke="#27AE60" stroke-width="1.2" fill="#fff"/><circle cx="18" cy="12" r="1.6" fill="#27AE60"/></svg>`;
         case 'bullseye':
-            return `<svg ${common}><circle cx="12" cy="12" r="9" stroke="#6366F1" stroke-width="1.2" fill="none"/><circle cx="12" cy="12" r="5" stroke="#8B5CF6" stroke-width="1.2" fill="none"/></svg>`;
+            return `<svg ${common}><circle cx="12" cy="12" r="9" stroke="#181818" stroke-width="1.2" fill="none"/><circle cx="12" cy="12" r="5" stroke="#181818" stroke-width="1.2" fill="none"/></svg>`;
         case 'percentage':
             return `<svg ${common}><path d="M4 4L20 20" stroke="#F39C12" stroke-width="1.6"/><circle cx="7.5" cy="7.5" r="1.8" fill="#F39C12"/><circle cx="16.5" cy="16.5" r="1.8" fill="#F39C12"/></svg>`;
         case 'home':
-            return `<svg ${common}><path d="M3 11L12 4L21 11" stroke="#8B5CF6" stroke-width="1.2" fill="none"/><rect x="6" y="11" width="12" height="8" rx="1" stroke="#6366F1" stroke-width="1.2" fill="#fff"/></svg>`;
+            return `<svg ${common}><path d="M3 11L12 4L21 11" stroke="#181818" stroke-width="1.2" fill="none"/><rect x="6" y="11" width="12" height="8" rx="1" stroke="#181818" stroke-width="1.2" fill="#fff"/></svg>`;
         case 'table':
             return `<svg ${common}><rect x="3" y="4" width="18" height="16" rx="1" stroke="#2C3E50" stroke-width="1.2" fill="#fff"/><path d="M3 10h18M10 4v16" stroke="#2C3E50" stroke-width="1"/></svg>`;
         case 'chart-bar':
-            return `<svg ${common}><rect x="4" y="10" width="3" height="10" rx="0.5" fill="#27AE60"/><rect x="10.5" y="6" width="3" height="14" rx="0.5" fill="#6366F1"/><rect x="17" y="3" width="3" height="17" rx="0.5" fill="#F39C12"/></svg>`;
+            return `<svg ${common}><rect x="4" y="10" width="3" height="10" rx="0.5" fill="#27AE60"/><rect x="10.5" y="6" width="3" height="14" rx="0.5" fill="#181818"/><rect x="17" y="3" width="3" height="17" rx="0.5" fill="#F39C12"/></svg>`;
         case 'users':
             return `<svg ${common}><circle cx="9" cy="8" r="2.2" fill="#2C3E50"/><path d="M4 18c1.5-4 7-4 8 0" stroke="#2C3E50" stroke-width="1.2" fill="none"/><circle cx="17" cy="8" r="1.8" fill="#5D6D7E"/></svg>`;
         default:
@@ -2447,6 +2564,20 @@ async exportMemberToPDF(memberId) {
                 const paymentDate = new Date(payment.date);
                 return paymentDate.getMonth() === parseInt(monthFilter) &&
                        paymentDate.getFullYear() === this.currentYear;
+            });
+        }
+
+        // Start/End month range filtering (inputs type=month: YYYY-MM)
+        const startMonthVal = (document.getElementById('paymentStartMonth') || {}).value;
+        const endMonthVal = (document.getElementById('paymentEndMonth') || {}).value;
+        if (startMonthVal || endMonthVal) {
+            let startDate = startMonthVal ? new Date(startMonthVal + '-01') : new Date('1970-01-01');
+            let endDate = endMonthVal ? new Date(endMonthVal + '-01') : new Date('2999-12-31');
+            // set endDate to last day of month
+            endDate = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0, 23,59,59,999);
+            filteredPayments = filteredPayments.filter(payment => {
+                const pd = new Date(payment.date);
+                return pd >= startDate && pd <= endDate;
             });
         }
 
@@ -3037,24 +3168,9 @@ async exportLotToPDF(lotId) {
 }
 
     showAddMemberModal() {
-        // Récupérer le prix d'un lot (tous les lots ont le même prix)
-        const lotPrice = this.getUnitPrice();
-
-        // Si aucun lot n'est créé, afficher un message utile et empêcher la création de membre
-        if (!this.lots || this.lots.length === 0) {
-            const contentNoLot = `
-                <div style="padding:20px; max-width:520px;">
-                    <p style="color:#b71c1c; font-weight:600; font-size:1.05em;">Aucun lot configuré</p>
-                    <p>Vous devez d'abord créer au moins un lot avec un prix unitaire avant d'ajouter des membres. Le principe du site repose sur un prix unitaire fixe.</p>
-                    <div style="text-align:right; margin-top:16px;">
-                        <button class="btn btn-secondary" onclick="app.closeModal()">Fermer</button>
-                        <button class="btn btn-primary" onclick="app.switchTab('lots'); app.closeModal();">Aller aux Lots</button>
-                    </div>
-                </div>
-            `;
-            this.showModal('Aucun Lot', contentNoLot);
-            return;
-        }
+        // Récupérer le prix d'un lot (tous les lots ont le même prix). Autoriser création même sans lots.
+        const fetchedPrice = this.getUnitPrice();
+        const lotPrice = (fetchedPrice == null) ? 1500000 : fetchedPrice;
 
         const content = `
             <form id="memberForm">
@@ -3064,7 +3180,7 @@ async exportLotToPDF(lotId) {
                 </div>
                 <div class="form-group">
                     <label class="form-label">Email</label>
-                    <input type="email" class="form-input" id="memberEmail" required>
+                    <input type="email" class="form-input" id="memberEmail">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Téléphone</label>
@@ -3077,7 +3193,7 @@ async exportLotToPDF(lotId) {
                 <div class="form-group">
                     <label class="form-label">Nombre de lots</label>
                     <input type="number" class="form-input" id="memberNumberOfLots" min="1" value="1" required>
-                    <small style="color: #666; margin-top: 5px; display: block;">Prix unitaire: ${this.formatCurrency(lotPrice)}</small>
+                    <small style="color: #666; margin-top: 5px; display: block;">Prix unitaire: ${this.formatCurrency(lotPrice)}${fetchedPrice == null ? ' (par défaut)' : ''}</small>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Durée de paiement (en mois)</label>
@@ -3121,7 +3237,8 @@ async exportLotToPDF(lotId) {
         const startDateInput = document.getElementById('memberStartDate');
 
         if (startDateInput) {
-            startDateInput.value = new Date().toISOString().split('T')[0];
+            // Default start to July 1, 2025 as requested
+            startDateInput.value = '2025-07-01';
         }
 
         const updateQuota = () => {
@@ -3139,6 +3256,8 @@ async exportLotToPDF(lotId) {
             const safeStartDate = isNaN(startDateValue.getTime()) ? new Date() : startDateValue;
             const endDate = new Date(safeStartDate);
             endDate.setMonth(endDate.getMonth() + duration);
+            // Show end as the last day of the previous month (e.g., for 12 months from July -> end in June)
+            endDate.setDate(endDate.getDate() - 1);
 
             calculatedStartDate.textContent = this.formatDate(safeStartDate.toISOString());
             calculatedEndDate.textContent = this.formatDate(endDate.toISOString());
@@ -3196,7 +3315,7 @@ async exportLotToPDF(lotId) {
                 </div>
 
                 <div id="quotaWarning" class="quota-warning" style="display: none;">
-                    ⚠️ Ce paiement dépassera le quota mensuel du membre!
+                    Ce paiement dépassera le quota mensuel du membre!
                 </div>
 
                 <div class="form-actions">
@@ -3356,12 +3475,22 @@ async exportLotToPDF(lotId) {
             return lot ? lot.name : 'Lot inconnu';
         }).join(', ') : 'Aucun lot assigné';
 
-        document.getElementById('selectedMemberName').textContent = member.name;
-        document.getElementById('selectedMemberDetails').innerHTML =
-            `${member.email} • ${member.phone}<br>
-            <strong>Lots:</strong> ${memberLots}<br>
-            <strong>Quota mensuel:</strong> ${this.formatCurrency(member.monthlyQuota)} •
-            <strong>Durée:</strong> ${member.paymentDuration} mois`;
+        const nameEl = document.getElementById('selectedMemberName');
+        const detailsEl = document.getElementById('selectedMemberDetails');
+        if (nameEl) nameEl.textContent = member.name;
+
+        if (detailsEl) {
+            const contactParts = [];
+            if (member.email) contactParts.push(member.email);
+            if (member.phone) contactParts.push(member.phone);
+            const contactLine = contactParts.length ? contactParts.join(' • ') : '—';
+
+            detailsEl.innerHTML =
+                `${contactLine}<br>
+                <strong>Lots:</strong> ${memberLots}<br>
+                <strong>Quota mensuel:</strong> ${this.formatCurrency(member.monthlyQuota)} •
+                <strong>Durée:</strong> ${member.paymentDuration} mois`;
+        }
         document.getElementById('selectedMemberInfo').style.display = 'block';
     }
 
@@ -3719,7 +3848,7 @@ async generatePaymentReceipt(payment, member, monthsCovered) {
         const fileName = `Recu_${member.name.replace(/[^a-zA-Z0-9]/g,'_')}_${(new Date()).toISOString().slice(0,10)}.pdf`;
         pdf.save(fileName);
 
-        this.showNotification('Reçu PDF généré ✅', 'success');
+        this.showNotification('Reçu PDF généré', 'success');
 
     } catch (error) {
         console.error('Erreur génération reçu :', error);
@@ -3853,10 +3982,7 @@ addMember(memberData) {
 }
 
     addMember() {
-        if (!this.lots || this.lots.length === 0) {
-            this.showToast("Impossible d'ajouter un membre : aucun lot n'est configuré.", 'error');
-            return;
-        }
+        // Allow adding members even if no lots exist; unit price will default to 0 if not configured
         const name = document.getElementById('memberName').value;
         const email = document.getElementById('memberEmail').value;
         const phone = document.getElementById('memberPhone').value;
@@ -3865,7 +3991,8 @@ addMember(memberData) {
         const paymentDuration = parseInt(document.getElementById('paymentDuration').value);
 
         // Récupérer le prix unitaire d'un lot
-        const lotPrice = this.getUnitPrice();
+        const fetchedPrice = this.getUnitPrice();
+        const lotPrice = (fetchedPrice == null) ? 1500000 : fetchedPrice;
         const totalPrice = numberOfLots * lotPrice;
         const monthlyQuota = paymentDuration > 0 ? Math.round((totalPrice / paymentDuration) / 100) * 100 : 0;
 
@@ -3874,6 +4001,8 @@ addMember(memberData) {
         const startDate = isNaN(parsedStartDate.getTime()) ? new Date() : parsedStartDate;
         const endDate = new Date(startDate);
         endDate.setMonth(endDate.getMonth() + paymentDuration);
+        // Store endDate as the last day before the next month so 12 months from July -> ends in June
+        endDate.setDate(endDate.getDate() - 1);
 
         const member = {
             id: this.generateId(),
@@ -4021,7 +4150,7 @@ addMember(memberData) {
                 </div>
                 <div class="form-group">
                     <label class="form-label">Email</label>
-                    <input type="email" class="form-input" id="editMemberEmail" value="${member.email}" required>
+                    <input type="email" class="form-input" id="editMemberEmail" value="${member.email}">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Téléphone</label>
@@ -4377,6 +4506,8 @@ getMonthlyTotal() {
         const searchTerm = document.getElementById('paymentSearch').value.toLowerCase();
         const monthFilter = document.getElementById('monthFilter').value;
         const memberFilter = document.getElementById('memberFilter').value;
+        const startMonthVal = (document.getElementById('paymentStartMonth') || {}).value;
+        const endMonthVal = (document.getElementById('paymentEndMonth') || {}).value;
 
         let filteredPayments = this.payments;
 
@@ -4398,6 +4529,17 @@ getMonthlyTotal() {
             });
         }
 
+        // Apply start/end month range to PDF export as well
+        if (startMonthVal || endMonthVal) {
+            let startDate = startMonthVal ? new Date(startMonthVal + '-01') : new Date('1970-01-01');
+            let endDate = endMonthVal ? new Date(endMonthVal + '-01') : new Date('2999-12-31');
+            endDate = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0, 23,59,59,999);
+            filteredPayments = filteredPayments.filter(payment => {
+                const pd = new Date(payment.date);
+                return pd >= startDate && pd <= endDate;
+            });
+        }
+
         if (memberFilter) {
             filteredPayments = filteredPayments.filter(payment =>
                 payment.memberId === memberFilter
@@ -4413,8 +4555,8 @@ getMonthlyTotal() {
         const reportHtml = `
             <div style="font-family: Arial, sans-serif; max-width: 950px; margin: 0 auto; padding: 30px;">
                 <!-- En-tête -->
-                <div style="text-align: center; margin-bottom: 30px; border-bottom: 3px solid #6366F1; padding-bottom: 20px;">
-                    <h1 style="color: #6366F1; margin: 0; font-size: 28px;">CI Habitat</h1>
+                <div style="text-align: center; margin-bottom: 30px; border-bottom: 3px solid #181818; padding-bottom: 20px;">
+                    <h1 style="color: #181818; margin: 0; font-size: 28px;">CI Habitat</h1>
                     <p style="color: #5D6D7E; margin: 10px 0 0 0; font-size: 16px;">Grand Livre des Paiements</p>
                 </div>
 
@@ -4457,8 +4599,8 @@ getMonthlyTotal() {
 
                 <!-- Tableau des Paiements -->
                 <div style="margin-bottom: 25px;">
-                    <h3 style="color: #2C3E50; border-bottom: 2px solid #6366F1; padding-bottom: 10px; margin-bottom: 15px;">
-                        📋 Détail des Paiements
+                    <h3 style="color: #2C3E50; border-bottom: 2px solid #181818; padding-bottom: 10px; margin-bottom: 15px;">
+                        <i class="fas fa-clipboard-list" style="margin-right:8px;color:#2C3E50"></i> Détail des Paiements
                     </h3>
                     ${filteredPayments.length > 0 ? `
                         <table style="width: 100%; border-collapse: collapse; background: white;">
@@ -4495,8 +4637,8 @@ getMonthlyTotal() {
                 <!-- Analyse par Membre -->
                 ${filteredPayments.length > 0 ? `
                     <div style="margin-bottom: 25px;">
-                        <h3 style="color: #2C3E50; border-bottom: 2px solid #6366F1; padding-bottom: 10px; margin-bottom: 15px;">
-                            👥 Résumé par Membre
+                        <h3 style="color: #2C3E50; border-bottom: 2px solid #181818; padding-bottom: 10px; margin-bottom: 15px;">
+                            <i class="fas fa-users" style="margin-right:8px;color:#2C3E50"></i> Résumé par Membre
                         </h3>
                         <table style="width: 100%; border-collapse: collapse;">
                             <thead>
@@ -4526,9 +4668,9 @@ getMonthlyTotal() {
 
                 <!-- Pied de page -->
                 <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #E0E6ED; text-align: center; color: #5D6D7E; font-size: 12px;">
-                    <p style="margin: 5px 0;">📞 Contact: 01 618 837 90</p>
+                    <p style="margin: 5px 0;"><i class="fas fa-phone" style="margin-right:6px;color:#5D6D7E"></i> Contact: 01 618 837 90</p>
                     <p style="margin: 5px 0;">Document généré le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR')}</p>
-                    <p style="margin: 15px 0 0 0; font-weight: bold; color: #6366F1;">CI Habitat - L'immobilier Autrement</p>
+                    <p style="margin: 15px 0 0 0; font-weight: bold; color: #181818;">CI Habitat - L'immobilier Autrement</p>
                 </div>
             </div>
         `;
@@ -4569,11 +4711,11 @@ getMonthlyTotal() {
             const fileName = `Grand_Livre_Paiements_${now.toISOString().split('T')[0]}.pdf`;
             pdf.save(fileName);
             
-            this.showNotification('📄 Grand livre PDF généré avec succès !', 'success');
+            this.showNotification('Grand livre PDF généré avec succès !', 'success');
         }).catch(error => {
             console.error('Erreur génération PDF:', error);
             document.body.removeChild(reportContainer);
-            this.showNotification('❌ Erreur lors de la génération du PDF', 'error');
+            this.showNotification('Erreur lors de la génération du PDF', 'error');
         });
     }
 
@@ -4614,6 +4756,314 @@ getMonthlyTotal() {
 
     formatDate(dateString) {
         return new Date(dateString).toLocaleDateString('fr-FR');
+    }
+
+    showBulkAddMembersModal() {
+        const content = `
+            <div style="max-width:720px;padding:16px;">
+                <div style="margin-bottom:8px;">
+                    <label style="font-weight:600;display:block;margin-bottom:6px;">Importer fichier Excel/CSV</label>
+                    <input type="file" id="bulkMembersFile" accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:block;" />
+                </div>
+                <p style="margin:0 0 8px; font-weight:700;">Importer des Membres (CSV)</p>
+                <p style="margin:0 0 12px; color:#666;">Colonne obligatoires: <strong>name</strong>, optional: <strong>email,phone,numberOfLots,startDate,paymentDuration</strong>. Première ligne = en-têtes.</p>
+                <textarea id="bulkMembersCsv" placeholder="Exemples:\n- Liste de noms (une par ligne):\nJean Dupont\nMarie Kouamé\n- Ou CSV avec en-têtes:\nname,email,phone,numberOfLots,startDate,paymentDuration\nJean Dupont,jean@example.com,22501234567,1,2025-07-01,12" style="width:100%;height:200px;padding:8px;border:1px solid #ddd;border-radius:6px;"></textarea>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+                    <button class="btn btn-secondary" onclick="app.closeModal()">Annuler</button>
+                    <button class="btn btn-outline" id="previewImportBtn" style="background:#fff;border:1px solid #ccc;color:#333;">Prévisualiser</button>
+                    <button class="btn btn-primary" id="importMembersBtn">Importer</button>
+                </div>
+                <div id="bulkImportPreview" style="margin-top:12px;max-height:320px;overflow:auto;border:1px solid #eee;padding:8px;border-radius:6px;background:#fff;display:none;"></div>
+                <div style="margin-top:10px;color:#777;font-size:0.9em;">Remarque: un <code>id</code> unique sera généré pour chaque membre et les données seront sauvegardées dans Firebase.</div>
+            </div>
+        `;
+
+        this.showModal('Importer Membres en Masse', content);
+
+        // Support Excel/CSV file import: parse first sheet to CSV and populate textarea for preview
+        const fileInput = document.getElementById('bulkMembersFile');
+        if (fileInput) {
+            fileInput.addEventListener('change', (ev) => {
+                const f = ev.target.files && ev.target.files[0];
+                if (!f) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = e.target.result;
+                        // XLSX is loaded via CDN in index.html
+                        const wb = XLSX.read(data, { type: 'array' });
+                        const firstName = wb.SheetNames && wb.SheetNames[0];
+                        if (!firstName) { this.showToast('Fichier vide', 'error'); return; }
+                        const sheet = wb.Sheets[firstName];
+                        const csv = XLSX.utils.sheet_to_csv(sheet);
+                        const ta = document.getElementById('bulkMembersCsv');
+                        if (ta) ta.value = csv;
+                        this.showToast('Feuille chargée pour prévisualisation', 'success');
+                    } catch (err) {
+                        console.error('Erreur lecture fichier import:', err);
+                        this.showToast('Impossible de lire le fichier', 'error');
+                    }
+                };
+                reader.readAsArrayBuffer(f);
+            });
+        }
+
+        const importBtn = document.getElementById('importMembersBtn');
+        const previewBtn = document.getElementById('previewImportBtn');
+        const previewContainer = document.getElementById('bulkImportPreview');
+        const renderPreview = () => {
+            const txt = document.getElementById('bulkMembersCsv').value || '';
+            const lines = txt.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+            if (lines.length === 0) { this.showToast('Aucune donnée pour prévisualiser', 'error'); return; }
+
+            let headers = lines[0].split(',').map(h => h.trim());
+            let rows = lines.slice(1);
+            const known = ['name','email','phone','numberoflots','startdate','paymentduration','duration','lots','nom','fullname','start'];
+            if (!headers.map(h=>h.toLowerCase()).includes('name') && headers.every(h => !known.includes(h.toLowerCase()))) {
+                // guess format: check if first line looks like data 'name,number'
+                const firstCols = lines[0].split(',').map(c => c.trim());
+                const secondIsNum = firstCols.length >= 2 && /^\s*-?\d+(?:[.,]\d+)?\s*$/.test(firstCols[1]);
+                const firstIsName = firstCols.length >= 1 && /[a-zA-Zéèàçùâêîôûëïüœ'-]/.test(firstCols[0]);
+                if (firstCols.length >= 2 && firstIsName && secondIsNum) {
+                    headers = ['name','numberOfLots'];
+                    rows = lines.slice(0);
+                } else {
+                    // treat as single-name-per-line
+                    headers = ['name'];
+                    rows = lines.slice(0);
+                }
+            }
+
+            const maxRows = 200;
+            const table = document.createElement('table');
+            table.style.width = '100%';
+            table.style.borderCollapse = 'collapse';
+            const thead = document.createElement('thead');
+            const thr = document.createElement('tr');
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h;
+                th.style.borderBottom = '1px solid #ddd';
+                th.style.padding = '6px';
+                th.style.textAlign = 'left';
+                thr.appendChild(th);
+            });
+            thead.appendChild(thr);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            rows.slice(0, maxRows).forEach(r => {
+                const tr = document.createElement('tr');
+                const cols = r.split(',').map(c => c.trim());
+                for (let i=0;i<headers.length;i++) {
+                    const td = document.createElement('td');
+                    td.textContent = cols[i] || '';
+                    td.style.padding = '6px';
+                    td.style.borderBottom = '1px solid #f1f1f1';
+                    tr.appendChild(td);
+                }
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+            if (previewContainer) {
+                previewContainer.innerHTML = '';
+                previewContainer.appendChild(table);
+                previewContainer.style.display = 'block';
+                if (rows.length > maxRows) {
+                    const more = document.createElement('div');
+                    more.style.marginTop = '8px';
+                    more.style.fontSize = '0.9em';
+                    more.style.color = '#666';
+                    more.textContent = `Affichage ${maxRows} premières lignes sur ${rows.length}`;
+                    previewContainer.appendChild(more);
+                }
+                previewContainer.scrollIntoView({ behavior: 'smooth' });
+            }
+        };
+
+        if (previewBtn) {
+            previewBtn.addEventListener('click', () => renderPreview());
+        }
+        if (importBtn) {
+            importBtn.addEventListener('click', () => {
+                const txt = document.getElementById('bulkMembersCsv').value || '';
+                const lines = txt.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+                if (lines.length === 0) { this.showToast('Aucune donnée fournie', 'error'); return; }
+
+                let headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                let rows = lines.slice(1);
+
+                // If input appears to be a simple list or a two-column list (name,numberOfLots) without headers,
+                // detect and adapt: prefer ['name','numberOfLots'] when second column looks numeric.
+                const known = ['name','email','phone','numberoflots','startdate','paymentduration','duration','lots','nom','fullname','start'];
+                if (!headers.includes('name') && headers.every(h => !known.includes(h))) {
+                    // inspect first line cells to guess format
+                    const firstCols = lines[0].split(',').map(c => c.trim());
+                    const secondLooksNumeric = firstCols.length >= 2 && /^\s*-?\d+(?:[.,]\d+)?\s*$/.test(firstCols[1]);
+                    const firstLooksLikeName = firstCols.length >= 1 && /[a-zA-Zéèàçùâêîôûëïüœ'-]/.test(firstCols[0]);
+                    if (firstCols.length >= 2 && firstLooksLikeName && secondLooksNumeric) {
+                        headers = ['name', 'numberOfLots'];
+                        rows = lines.slice(0); // include first line as data
+                    } else {
+                        // preserve all lines as rows and use 'name' as header
+                        rows = lines.slice(0); // include first line
+                        headers = ['name'];
+                    }
+                }
+                const created = [];
+                // Normalize headers to lowercase keys so later lookups like 'numberoflots' work
+                headers = headers.map(h => String(h).trim().toLowerCase());
+                const errors = [];
+
+                // Detect payment-month headers mapping (e.g. "juil 2025", "juillet 2025", "juin 2026")
+                const monthNamesMap = {
+                    'jan':1,'janv':1,'janvier':1,
+                    'fev':2,'février':2,'fevrier':2,'fév':2,
+                    'mar':3,'mars':3,
+                    'avr':4,'avril':4,
+                    'mai':5,
+                    'jun':6,'juin':6,
+                    'jul':7,'juil':7,'juillet':7,
+                    'aug':8,'aou':8,'aoû':8,'août':8,'aout':8,
+                    'sep':9,'sept':9,'septembre':9,
+                    'oct':10,'octobre':10,
+                    'nov':11,'novembre':11,
+                    'dec':12,'déc':12,'decembre':12,'décembre':12
+                };
+
+                // Define allowed period: July 2025 -> June 2026
+                const allowedMonthKeys = [];
+                for (let y=2025; y<=2026; y++) {
+                    const startM = (y===2025)?7:1;
+                    const endM = (y===2026)?6:12;
+                    for (let m=startM; m<=endM; m++) {
+                        allowedMonthKeys.push(`${y}-${String(m).padStart(2,'0')}`);
+                    }
+                }
+
+                const paymentHeaderMap = {}; // index -> monthKey
+                headers.forEach((h, idx) => {
+                    // try to find month name and year in header text
+                    const parts = h.replace(/[-_.]/g, ' ').split(/\s+/).filter(Boolean);
+                    let foundMonth = null; let foundYear = null;
+                    parts.forEach(p => {
+                        const clean = p.replace(/[^a-z0-9éèêàôûç]/g,'');
+                        if (!foundMonth) {
+                            const key = Object.keys(monthNamesMap).find(k => clean.includes(k));
+                            if (key) foundMonth = monthNamesMap[key];
+                        }
+                        if (!foundYear) {
+                            const yMatch = p.match(/(20\d{2}|\b\d{2}\b)/);
+                            if (yMatch) {
+                                let yy = yMatch[0];
+                                if (yy.length === 2) yy = (yy.length===2 ? '20'+yy : yy);
+                                foundYear = parseInt(yy,10);
+                            }
+                        }
+                    });
+                    if (foundMonth && foundYear) {
+                        const mk = `${foundYear}-${String(foundMonth).padStart(2,'0')}`;
+                        if (allowedMonthKeys.includes(mk)) {
+                            paymentHeaderMap[idx] = mk;
+                        }
+                    }
+                });
+
+                rows.forEach((r, idx) => {
+                    const cols = r.split(',').map(c => c.trim());
+                    const obj = {};
+                    headers.forEach((h, i) => { obj[h] = cols[i] || ''; });
+
+                    const name = obj.name || obj.nom || obj.fullname || '';
+                    if (!name) {
+                        errors.push(`Ligne ${idx+2}: nom manquant`);
+                        return;
+                    }
+
+                    const email = obj.email || '';
+                    const phone = obj.phone || '';
+                    const numberOfLots = parseInt(obj.numberoflots || obj.lots || '1', 10) || 1;
+                    let paymentDuration = parseInt(obj.paymentduration || obj.duration || '12', 10) || 12;
+                    let startDate = obj.startdate || obj.start || '2025-07-01';
+
+                    // Detect explicit French month-range like "juil 25,..,juin 2026" anywhere in the row
+                    const rowText = Object.values(obj).join(' ').toLowerCase();
+                    const hasJuil = /jui[lLé]t?|juil/.test(rowText);
+                    const hasJuin = /juin/.test(rowText);
+                    const has25 = /(?:\b25\b|2025)/.test(rowText);
+                    const has26 = /(?:\b26\b|2026)/.test(rowText);
+                    if (hasJuil && hasJuin && (has25 || has26)) {
+                        // Force period July 2025 -> June 2026
+                        startDate = '2025-07-01';
+                        paymentDuration = 12;
+                    }
+
+                    const unitPrice = this.getUnitPrice();
+                    const totalLotAmount = numberOfLots * unitPrice;
+                    const monthlyQuota = paymentDuration > 0 ? Math.round((totalLotAmount / paymentDuration) / 100) * 100 : 0;
+
+                    const member = {
+                        id: this.generateId(),
+                        name: name,
+                        email: email,
+                        phone: phone,
+                        numberOfLots: numberOfLots,
+                        paymentDuration: paymentDuration,
+                        duration: paymentDuration,
+                        unitPrice: unitPrice,
+                        totalLotAmount: totalLotAmount,
+                        monthlyQuota: monthlyQuota,
+                        startDate: new Date(startDate).toISOString(),
+                        endDate: (function(sd, dur){ const d = new Date(sd); d.setMonth(d.getMonth()+dur); d.setDate(d.getDate()-1); return d.toISOString(); })(startDate, paymentDuration),
+                        createdAt: new Date().toISOString()
+                    };
+
+                    // Create payments for any monthly columns matching Jul 2025 -> Jun 2026
+                    const paymentsCreated = [];
+                    Object.keys(paymentHeaderMap).forEach(colIdx => {
+                        const mk = paymentHeaderMap[colIdx];
+                        const val = cols[colIdx] ? cols[colIdx].replace(/[^0-9.,-]/g, '').replace(',', '.') : '';
+                        const num = parseFloat(val);
+                        if (!isNaN(num) && num > 0) {
+                            const [y, m] = mk.split('-');
+                            const dateIso = new Date(parseInt(y,10), parseInt(m,10)-1, 1).toISOString();
+                            const pay = {
+                                id: this.generateId(),
+                                memberId: member.id,
+                                amount: Math.round(num),
+                                date: dateIso,
+                                monthKey: mk,
+                                createdAt: new Date().toISOString()
+                            };
+                            paymentsCreated.push(pay);
+                        }
+                    });
+
+
+                    this.members.push(member);
+                    created.push(member);
+
+                    // Attach created payments to global payments array
+                    if (paymentsCreated && paymentsCreated.length > 0) {
+                        this.payments = this.payments || [];
+                        this.payments.push(...paymentsCreated);
+                    }
+                });
+
+                if (created.length > 0) {
+                    this.saveData();
+                    this.closeModal();
+                    if (typeof this.renderMembers === 'function') this.renderMembers();
+                    if (typeof this.updateStats === 'function') this.updateStats();
+                    this.showToast(`${created.length} membres importés avec succès`);
+                }
+                if (errors.length > 0) {
+                    console.warn('Erreurs import:', errors);
+                    this.showToast(`${errors.length} erreurs lors de l'import (voir console)`, 'error');
+                }
+            });
+        }
     }
 
     saveData() {
@@ -4669,10 +5119,27 @@ this.saveLots();
     }
 
     updateStatistics() {
-        this.populateYearFilter();
+        this.setupStatsFilters();
         this.updateStatisticsOverview();
         this.updateMonthlyChart();
         this.updatePerformanceTable();
+    }
+
+    setupStatsFilters() {
+        if (this._statsFilterInitialized) return;
+        this._statsFilterInitialized = true;
+        const startEl = document.getElementById('statsStartDate');
+        const endEl = document.getElementById('statsEndDate');
+        const applyBtn = document.getElementById('applyStatsFilter');
+        const now = new Date();
+        // Default start to July 2025 as requested
+        if (startEl && !startEl.value) startEl.value = '2025-07';
+        if (endEl && !endEl.value) endEl.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        if (applyBtn) applyBtn.addEventListener('click', () => {
+            this.updateStatisticsOverview();
+            this.updateMonthlyChart();
+            this.updatePerformanceTable();
+        });
     }
 
     populateYearFilter() {
@@ -4706,16 +5173,27 @@ this.saveLots();
     }
 
     updateStatisticsOverview() {
-        const selectedYear = document.getElementById('statsYearFilter').value;
+        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
+        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
         let filteredPayments = this.payments;
         let filteredMembers = this.members;
 
-        if (selectedYear) {
+        let startDate = null;
+        let endDate = null;
+        if (startVal) startDate = new Date(startVal + '-01');
+        if (endVal) {
+            const tmp = new Date(endVal + '-01');
+            endDate = new Date(tmp.getFullYear(), tmp.getMonth() + 1, 0); // last day of month
+        }
+
+        if (startDate && endDate) {
             filteredPayments = this.payments.filter(payment => {
-                return new Date(payment.date).getFullYear() == selectedYear;
+                const d = new Date(payment.date);
+                return d >= startDate && d <= endDate;
             });
             filteredMembers = this.members.filter(member => {
-                return new Date(member.createdAt || new Date()).getFullYear() == selectedYear;
+                const d = new Date(member.createdAt || new Date());
+                return d >= startDate && d <= endDate;
             });
         }
 
@@ -4730,41 +5208,56 @@ this.saveLots();
     }
 
     updateMonthlyChart() {
-        const selectedYear = document.getElementById('statsYearFilter').value || new Date().getFullYear();
+        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
+        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
         const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
         const chartContainer = document.getElementById('monthlyChart');
         chartContainer.innerHTML = '';
 
-        const monthlyData = {};
-
-        for (let i = 0; i < 12; i++) {
-            monthlyData[i] = { payments: 0, amount: 0, newMembers: 0 };
+        // build months range
+        let months = [];
+        if (startVal && endVal) {
+            let cur = new Date(startVal + '-01');
+            const endDate = new Date(endVal + '-01');
+            while (cur <= endDate) {
+                months.push({ year: cur.getFullYear(), month: cur.getMonth() });
+                cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+            }
+        } else {
+            // default: current year full 12 months
+            const y = new Date().getFullYear();
+            for (let m = 0; m < 12; m++) months.push({ year: y, month: m });
         }
+
+        // initialize monthly data map keyed by YYYY-MM
+        const monthlyData = {};
+        months.forEach(m => {
+            const key = `${m.year}-${String(m.month+1).padStart(2,'0')}`;
+            monthlyData[key] = { payments: 0, amount: 0, newMembers: 0, label: `${monthNames[m.month]} ${m.year}` };
+        });
 
         this.payments.forEach(payment => {
             const paymentDate = new Date(payment.date);
-            if (paymentDate.getFullYear() == selectedYear) {
-                const month = paymentDate.getMonth();
-                monthlyData[month].payments++;
-                monthlyData[month].amount += payment.amount;
+            const key = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth()+1).padStart(2,'0')}`;
+            if (monthlyData[key]) {
+                monthlyData[key].payments++;
+                monthlyData[key].amount += payment.amount || 0;
             }
         });
 
         this.members.forEach(member => {
             const memberDate = new Date(member.createdAt || new Date());
-            if (memberDate.getFullYear() == selectedYear) {
-                const month = memberDate.getMonth();
-                monthlyData[month].newMembers++;
-            }
+            const key = `${memberDate.getFullYear()}-${String(memberDate.getMonth()+1).padStart(2,'0')}`;
+            if (monthlyData[key]) monthlyData[key].newMembers++;
         });
 
-        const maxPayments = Math.max(...Object.values(monthlyData).map(m => m.payments));
-        const maxMembers = Math.max(...Object.values(monthlyData).map(m => m.newMembers));
-        const maxValue = Math.max(maxPayments, maxMembers);
+        const values = Object.values(monthlyData);
+        const maxPayments = Math.max(...values.map(m => m.payments), 0);
+        const maxMembers = Math.max(...values.map(m => m.newMembers), 0);
+        const maxValue = Math.max(maxPayments, maxMembers, 1);
 
-        for (let i = 0; i < 12; i++) {
-            const data = monthlyData[i];
+        values.forEach(data => {
             const paymentHeight = maxValue > 0 ? (data.payments / maxValue) * 180 : 0;
             const memberHeight = maxValue > 0 ? (data.newMembers / maxValue) * 180 : 0;
 
@@ -4777,10 +5270,10 @@ this.saveLots();
                 <div class="chart-bar-container">
                     <div class="chart-bar-fill secondary" style="height: ${memberHeight}px;" title="Nouveaux membres: ${data.newMembers}"></div>
                 </div>
-                <div class="chart-bar-label">${monthNames[i]}</div>
+                <div class="chart-bar-label">${data.label}</div>
             `;
             chartContainer.appendChild(barContainer);
-        }
+        });
     }
 
 formatCurrencyForPDF(amount) {
@@ -4813,37 +5306,53 @@ getIconDataURL(iconClass, color = '#2C3E50', size = 16) {
 }
 
     updatePerformanceTable() {
-        const selectedYear = document.getElementById('statsYearFilter').value || new Date().getFullYear();
+        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
+        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
+        const selectedYear = null; // unused when range is set below
         const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
         const tableBody = document.getElementById('performanceTableBody');
         tableBody.innerHTML = '';
 
-        const monthlyData = {};
-
-        for (let i = 0; i < 12; i++) {
-            monthlyData[i] = { payments: 0, amount: 0, newMembers: 0 };
+        // build months range (default current year)
+        let months = [];
+        if (startVal && endVal) {
+            let cur = new Date(startVal + '-01');
+            const endDate = new Date(endVal + '-01');
+            while (cur <= endDate) {
+                months.push({ year: cur.getFullYear(), month: cur.getMonth() });
+                cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+            }
+        } else {
+            const y = new Date().getFullYear();
+            for (let m = 0; m < 12; m++) months.push({ year: y, month: m });
         }
+
+        const monthlyData = {};
+        months.forEach(m => monthlyData[m.month] = { payments: 0, amount: 0, newMembers: 0, label: `${m.month+1}/${m.year}` });
 
         this.payments.forEach(payment => {
             const paymentDate = new Date(payment.date);
-            if (paymentDate.getFullYear() == selectedYear) {
-                const month = paymentDate.getMonth();
-                monthlyData[month].payments++;
-                monthlyData[month].amount += payment.amount;
-            }
+            months.forEach((m, idx) => {
+                if (paymentDate.getFullYear() === m.year && paymentDate.getMonth() === m.month) {
+                    monthlyData[m.month].payments++;
+                    monthlyData[m.month].amount += payment.amount || 0;
+                }
+            });
         });
 
         this.members.forEach(member => {
             const memberDate = new Date(member.createdAt || new Date());
-            if (memberDate.getFullYear() == selectedYear) {
-                const month = memberDate.getMonth();
-                monthlyData[month].newMembers++;
-            }
+            months.forEach(m => {
+                if (memberDate.getFullYear() === m.year && memberDate.getMonth() === m.month) {
+                    monthlyData[m.month].newMembers++;
+                }
+            });
         });
 
-        for (let i = 0; i < 12; i++) {
-            const data = monthlyData[i];
+        for (let i = 0; i < months.length; i++) {
+            const m = months[i];
+            const data = monthlyData[m.month];
             const completionRate = this.members.length > 0 ? Math.round((data.payments / this.members.length) * 100) : 0;
 
             let performanceBadge = '';
@@ -4857,7 +5366,7 @@ getIconDataURL(iconClass, color = '#2C3E50', size = 16) {
 
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${monthNames[i]}</td>
+                <td>${monthNames[m.month]}</td>
                 <td>${data.payments}</td>
                 <td>${this.formatCurrency(data.amount)}</td>
                 <td>${data.newMembers}</td>
@@ -4868,8 +5377,10 @@ getIconDataURL(iconClass, color = '#2C3E50', size = 16) {
     }
 
     exportStatist() {
-        const selectedYear = document.getElementById('statsYearFilter').value || new Date().getFullYear();
-        this.showToast(`Export des statistiques ${selectedYear} terminé!`, 'success');
+        const startVal = document.getElementById('statsStartDate') ? document.getElementById('statsStartDate').value : null;
+        const endVal = document.getElementById('statsEndDate') ? document.getElementById('statsEndDate').value : null;
+        const label = startVal && endVal ? `${startVal} → ${endVal}` : 'période sélectionnée';
+        this.showToast(`Export des statistiques ${label} terminé!`, 'success');
     }
 
 printReceipt(paymentId) {
@@ -5003,14 +5514,14 @@ function initializeCharts() {
                 datasets: [{
                     label: 'Paiements Collectés',
                     data: monthsData.amounts,
-                    borderColor: 'rgb(99, 102, 241)',
-                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    borderColor: '#181818',
+                    backgroundColor: 'rgba(24,24,24,0.06)',
                     borderWidth: 3,
                     tension: 0.4,
                     fill: true,
                     pointRadius: 5,
                     pointHoverRadius: 7,
-                    pointBackgroundColor: 'rgb(99, 102, 241)',
+                    pointBackgroundColor: '#181818',
                     pointBorderColor: '#fff',
                     pointBorderWidth: 2
                 }]
@@ -5254,32 +5765,7 @@ function formatCurrency(amount) {
     }).format(rounded) + ' FCFA';
 }
 
-// Gestionnaire du mode sombre
-function initThemeToggle() {
-    const themeBtn = document.getElementById('toggleTheme');
-    if (!themeBtn) return;
-    
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    if (savedTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-        themeBtn.innerHTML = '<i class="fas fa-sun"></i><span>Mode Clair</span>';
-    }
-    
-    themeBtn.addEventListener('click', () => {
-        document.body.classList.toggle('dark-mode');
-        const isDark = document.body.classList.contains('dark-mode');
-        
-        localStorage.setItem('theme', isDark ? 'dark' : 'light');
-        themeBtn.innerHTML = isDark 
-            ? '<i class="fas fa-sun"></i><span>Mode Clair</span>'
-            : '<i class="fas fa-moon"></i><span>Mode Sombre</span>';
-        
-        // Rafraîchir les graphiques pour le nouveau thème
-        if (paymentsChart) {
-            setTimeout(() => initializeCharts(), 100);
-        }
-    });
-}
+// Dark mode toggle removed — functionality intentionally disabled.
 
 // Actions rapides
 function initQuickActions() {
@@ -5298,6 +5784,13 @@ function initQuickActions() {
         quickAddMember.addEventListener('click', () => {
             document.querySelector('[data-tab="members"]')?.click();
             setTimeout(() => document.getElementById('addMemberBtn')?.click(), 300);
+        });
+    }
+    const bulkImportMembers = document.getElementById('bulkImportMembersBtn');
+    if (bulkImportMembers) {
+        bulkImportMembers.addEventListener('click', () => {
+            document.querySelector('[data-tab="members"]')?.click();
+            setTimeout(() => window.paymentManager.showBulkAddMembersModal(), 300);
         });
     }
     
@@ -5386,7 +5879,7 @@ function generatePaymentReceipt(paymentId) {
     if (!member) return;
     
     const receiptHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; border: 2px solid #6366F1;">
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; border: 2px solid #181818;">
             <div style="text-align: center; margin-bottom: 30px;">
                 <h1 style="color: #6366F1; margin: 0;">CI Habitat</h1>
                 <p style="color: #5D6D7E; margin: 5px 0;">Reçu de Paiement</p>
@@ -5458,7 +5951,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.paymentManager) {
             initializeCharts();
             updateAlerts();
-            initThemeToggle();
+            // initThemeToggle(); removed — dark mode toggle UI disabled
             initQuickActions();
             initNotifications();
             
@@ -5549,7 +6042,7 @@ function initNotifications() {
     const notificationsDropdown = document.getElementById('notificationsDropdown');
     const markAllRead = document.getElementById('markAllRead');
     
-    console.log('🔔 Initialisation des notifications...');
+    console.log('Initialisation des notifications...');
     console.log('Bouton trouvé:', notificationsBtn);
     console.log('Position du bouton:', notificationsBtn ? notificationsBtn.getBoundingClientRect() : 'N/A');
     console.log('Dropdown trouvé:', notificationsDropdown);
@@ -5564,11 +6057,11 @@ function initNotifications() {
     }
     
     if (!notificationsBtn || !notificationsDropdown) {
-        console.error('❌ Éléments de notifications non trouvés!');
+        console.error('Éléments de notifications non trouvés!');
         return;
     }
     
-    console.log('✅ Système de notifications initialisé');
+    console.log('Système de notifications initialisé');
     
     // Toggle dropdown
     notificationsBtn.addEventListener('click', (e) => {
