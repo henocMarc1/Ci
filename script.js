@@ -5085,15 +5085,13 @@ getMonthlyTotal() {
                     <input type="file" id="bulkMembersFile" accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:block;" />
                 </div>
                 <p style="margin:0 0 8px; font-weight:700;">Importer des Membres (CSV)</p>
-                <p style="margin:0 0 12px; color:#666;">Colonne obligatoires: <strong>name</strong>, optional: <strong>email,phone,numberOfLots,startDate,paymentDuration</strong>. Première ligne = en-têtes.</p>
-                <textarea id="bulkMembersCsv" placeholder="Exemples:\n- Liste de noms (une par ligne):\nJean Dupont\nMarie Kouamé\n- Ou CSV avec en-têtes:\nname,email,phone,numberOfLots,startDate,paymentDuration\nJean Dupont,jean@example.com,22501234567,1,2025-07-01,12" style="width:100%;height:200px;padding:8px;border:1px solid #ddd;border-radius:6px;"></textarea>
+                <textarea id="bulkMembersCsv" placeholder="Claudia Kodjane ,2" style="width:100%;height:200px;padding:8px;border:1px solid #ddd;border-radius:6px;"></textarea>
                 <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
                     <button class="btn btn-secondary" onclick="app.closeModal()">Annuler</button>
                     <button class="btn btn-outline" id="previewImportBtn" style="background:#fff;border:1px solid #ccc;color:#333;">Prévisualiser</button>
                     <button class="btn btn-primary" id="importMembersBtn">Importer</button>
                 </div>
                 <div id="bulkImportPreview" style="margin-top:12px;max-height:320px;overflow:auto;border:1px solid #eee;padding:8px;border-radius:6px;background:#fff;display:none;"></div>
-                <div style="margin-top:10px;color:#777;font-size:0.9em;">Remarque: un <code>id</code> unique sera généré pour chaque membre et les données seront sauvegardées dans Firebase.</div>
             </div>
         `;
 
