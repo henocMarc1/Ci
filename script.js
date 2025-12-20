@@ -1,3 +1,31 @@
+// Safe storage wrappers: detect if localStorage is available, otherwise fallback to in-memory object
+function storageAvailable(type = 'localStorage') {
+    try {
+        var storage = window[type];
+        var x = '__storage_test__';
+        storage.setItem(x, x);
+        storage.removeItem(x);
+        return true;
+    }
+    catch (e) {
+        return false;
+    }
+}
+
+const _storageFallback = {};
+function safeGetItem(key) {
+    if (storageAvailable('localStorage')) {
+        try { return localStorage.getItem(key); } catch(e){ return _storageFallback[key] || null; }
+    }
+    return _storageFallback.hasOwnProperty(key) ? _storageFallback[key] : null;
+}
+function safeSetItem(key, value) {
+    if (storageAvailable('localStorage')) {
+        try { localStorage.setItem(key, value); return; } catch(e) { _storageFallback[key] = value; return; }
+    }
+    _storageFallback[key] = value;
+}
+
 class PaymentManager {
     constructor() {
      this.db = firebase.database();
@@ -12,8 +40,9 @@ class PaymentManager {
 this.members = [];
 this.payments = [];
 this.lots = [];
-    const storedSelected = localStorage.getItem('selectedMembers');
+    const storedSelected = safeGetItem('selectedMembers');
     this.selectedMembers = storedSelected ? new Set(JSON.parse(storedSelected).map(String)) : new Set();
+    this._selectionDelegated = false;
     this.config = {};
         this.currentTab = 'dashboard';
         this.currentMonth = new Date().getMonth();
@@ -103,6 +132,124 @@ getSvgIcon(name, size = 20) {
             return `<svg ${common}><circle cx="12" cy="12" r="10" stroke="#2C3E50" stroke-width="1.2" fill="#fff"/></svg>`;
     }
 }
+
+    /* Selection helpers: unified API to manage member selection and UI updates */
+    selectMember(id) {
+        if (!id) return;
+        id = String(id);
+        this.selectedMembers.add(id);
+        safeSetItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+        this.updateSelectionUI();
+    }
+
+    deselectMember(id) {
+        if (!id) return;
+        id = String(id);
+        this.selectedMembers.delete(id);
+        safeSetItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+        this.updateSelectionUI();
+    }
+
+    toggleMemberSelection(id) {
+        if (!id) return;
+        id = String(id);
+        if (this.selectedMembers.has(id)) this.deselectMember(id); else this.selectMember(id);
+    }
+
+    updateSelectionUI() {
+        const membersGrid = document.getElementById('membersGrid');
+        if (!membersGrid) return;
+        // sync checkboxes
+        membersGrid.querySelectorAll('.member-select, .member-select-checkbox').forEach(cb => {
+            const id = cb.dataset.memberId;
+            if (!id) return;
+            cb.checked = this.selectedMembers.has(String(id));
+        });
+        // highlight rows/cards
+        membersGrid.querySelectorAll('.member-row, .member-card').forEach(el => {
+            const id = el.dataset.memberId;
+            if (!id) return;
+            el.classList.toggle('selected', this.selectedMembers.has(String(id)));
+        });
+        const bulkActions = document.getElementById('membersBulkActions');
+        if (bulkActions) bulkActions.style.display = this.selectedMembers.size > 0 ? 'flex' : 'none';
+
+        const selectAllGlobal = document.getElementById('selectAllMembersGlobal');
+        if (selectAllGlobal) {
+            const visible = membersGrid.querySelectorAll('.member-select, .member-select-checkbox');
+            selectAllGlobal.checked = visible.length > 0 && Array.from(visible).every(cb => cb.checked);
+        }
+
+        const selectAll = membersGrid.querySelector('#selectAllMembers');
+        if (selectAll) {
+            const tableCbs = membersGrid.querySelectorAll('.member-select');
+            selectAll.checked = tableCbs.length > 0 && Array.from(tableCbs).every(cb => cb.checked);
+        }
+
+        const bulkInfo = document.querySelector('.bulk-info');
+        if (bulkInfo) bulkInfo.textContent = `${this.selectedMembers.size} sélectionné(s)`;
+    }
+
+    attachSelectionDelegation() {
+        if (this._selectionDelegated) return;
+        const membersGrid = document.getElementById('membersGrid');
+        if (!membersGrid) return;
+
+        membersGrid.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target && (target.matches('.member-select') || target.matches('.member-select-checkbox'))) {
+                const id = target.dataset.memberId;
+                if (target.checked) this.selectMember(id); else this.deselectMember(id);
+            }
+        });
+
+        // Global header select-all (toolbar) - keep in delegated setup to avoid duplicate listeners
+        const selectAllGlobal = document.getElementById('selectAllMembersGlobal');
+        if (selectAllGlobal) {
+            selectAllGlobal.addEventListener('change', () => {
+                const checkboxes = membersGrid.querySelectorAll('.member-select, .member-select-checkbox');
+                if (selectAllGlobal.checked) {
+                    checkboxes.forEach(cb => { if (cb.dataset.memberId) this.selectMember(cb.dataset.memberId); });
+                } else {
+                    checkboxes.forEach(cb => { if (cb.dataset.memberId) this.deselectMember(cb.dataset.memberId); });
+                }
+            });
+        }
+
+        this._selectionDelegated = true;
+    }
+
+    attachGlobalAscendingSortHandlers() {
+        // Attache un handler simple sur tous les <table> pour tri ascendant (toujours du plus petit au plus grand)
+        document.querySelectorAll('table').forEach(table => {
+            if (table.dataset.ascSortAttached === '1') return;
+            const thead = table.querySelector('thead');
+            if (!thead) return;
+            const ths = Array.from(thead.querySelectorAll('th'));
+            ths.forEach((th, colIndex) => {
+                th.style.cursor = 'pointer';
+                th.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const tbody = table.tBodies[0] || table.querySelector('tbody');
+                    if (!tbody) return;
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    rows.sort((ra, rb) => {
+                        const a = (ra.children[colIndex] && ra.children[colIndex].textContent || '').trim();
+                        const b = (rb.children[colIndex] && rb.children[colIndex].textContent || '').trim();
+                        const an = parseFloat(a.replace(/[^0-9.,-]/g, '').replace(/,/g, '.'));
+                        const bn = parseFloat(b.replace(/[^0-9.,-]/g, '').replace(/,/g, '.'));
+                        if (!isNaN(an) && !isNaN(bn)) return an - bn;
+                        const ad = Date.parse(a);
+                        const bd = Date.parse(b);
+                        if (!isNaN(ad) && !isNaN(bd)) return ad - bd;
+                        return a.localeCompare(b, 'fr', {numeric: true});
+                    });
+                    rows.forEach(r => tbody.appendChild(r));
+                });
+            });
+            table.dataset.ascSortAttached = '1';
+        });
+    }
 
     async exportStatistics() {
     try {
@@ -586,6 +733,24 @@ getSvgIcon(name, size = 20) {
         }, 3000);
     }
 
+    showLoader(message = 'Chargement...') {
+        try {
+            const el = document.getElementById('globalLoader');
+            if (!el) return;
+            const msg = el.querySelector('.loader-message');
+            if (msg) msg.textContent = message;
+            el.classList.remove('hidden');
+        } catch (e) { console.warn('showLoader error', e); }
+    }
+
+    hideLoader() {
+        try {
+            const el = document.getElementById('globalLoader');
+            if (!el) return;
+            el.classList.add('hidden');
+        } catch (e) { console.warn('hideLoader error', e); }
+    }
+
     init() {
         this.loadFromFirebase();
         this.setupEventListeners();
@@ -775,10 +940,6 @@ renderLotMembers(members) {
     }).join('');
 }
 
-closeLotDetailsModal() {
-    document.getElementById('lotDetailsModal').classList.remove('active');
-}
-
     setupEventListeners() {
 
 document.querySelectorAll('.btn-receipt').forEach(btn => {
@@ -879,14 +1040,22 @@ document.querySelectorAll('.modal-tab').forEach(tab => {
                 const modal = document.getElementById('editUnitPriceModal');
                 const input = document.getElementById('editUnitPrice');
                 if (input) input.value = this.getUnitPrice() || '';
-                if (modal) modal.classList.add('active');
+                if (modal) {
+                    try { window._lastScrollY = window.scrollY || window.pageYOffset || 0; } catch (e) {}
+                    modal.classList.add('active');
+                    try { document.body.classList.add('modal-open'); } catch (e) {}
+                }
 
                 const saveBtn = document.getElementById('editUnitPriceSaveBtn');
                 const cancelBtn = document.getElementById('editUnitPriceCancelBtn');
                 const closeBtn = document.getElementById('editUnitPriceClose');
 
                 const cleanup = () => {
-                    if (modal) modal.classList.remove('active');
+                    if (modal) {
+                        modal.classList.remove('active');
+                        try { document.body.classList.remove('modal-open'); } catch (e) {}
+                        try { const y = window._lastScrollY || 0; window.scrollTo({ top: y, behavior: 'smooth' }); window._lastScrollY = null; } catch (e) {}
+                    }
                     if (saveBtn) saveBtn.removeEventListener('click', handleSave);
                     if (cancelBtn) cancelBtn.removeEventListener('click', handleCancel);
                     if (closeBtn) closeBtn.removeEventListener('click', handleCancel);
@@ -973,35 +1142,13 @@ document.querySelectorAll('.modal-tab').forEach(tab => {
             refreshCondensedLabel();
             condensedBtn.addEventListener('click', () => {
                 this.membersCondensed = !this.membersCondensed;
-                localStorage.setItem('membersCondensed', this.membersCondensed);
+                safeSetItem('membersCondensed', this.membersCondensed);
                 refreshCondensedLabel();
                 this.renderMembers();
             });
         }
 
-        // Global select-all and bulk actions (header toolbar)
-        const selectAllGlobal = document.getElementById('selectAllMembersGlobal');
-        if (selectAllGlobal) {
-            selectAllGlobal.addEventListener('change', () => {
-                const membersGrid = document.getElementById('membersGrid');
-                const checkboxes = membersGrid ? membersGrid.querySelectorAll('.member-select-checkbox, .member-select') : [];
-                if (selectAllGlobal.checked) {
-                    checkboxes.forEach(cb => cb.checked = true);
-                    document.querySelectorAll('[data-member-id]').forEach(el => {
-                        const id = el.dataset.memberId;
-                        if (id) this.selectedMembers.add(id);
-                    });
-                } else {
-                    checkboxes.forEach(cb => cb.checked = false);
-                    this.selectedMembers.clear();
-                }
-                localStorage.setItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
-                const bulkActions = document.getElementById('membersBulkActions');
-                if (bulkActions) bulkActions.style.display = this.selectedMembers.size > 0 ? 'flex' : 'none';
-                // Re-render list view to update selection UI
-                this.renderMembers();
-            });
-        }
+        // Selection delegation is attached in setupMemberEventListeners via attachSelectionDelegation().
 
         const bulkExportSelected = document.getElementById('bulkExportSelected');
         if (bulkExportSelected) bulkExportSelected.addEventListener('click', () => {
@@ -1015,26 +1162,167 @@ document.querySelectorAll('.modal-tab').forEach(tab => {
             if (!confirm('Supprimer les membres sélectionnés ?')) return;
             this.selectedMembers.forEach(id => this.deleteMember(id));
             this.selectedMembers.clear();
-            localStorage.setItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+            safeSetItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
             this.renderMembers();
         });
 
         const bulkMarkPaidSelected = document.getElementById('bulkMarkPaidSelected');
         if (bulkMarkPaidSelected) bulkMarkPaidSelected.addEventListener('click', () => {
             if (this.selectedMembers.size === 0) return this.showNotification('Aucun membre sélectionné', 'error');
-            // Marking paid: create a payment for current month for each selected member
+
             const now = new Date();
-            const monthKey = `${now.getFullYear()}-${String(now.getMonth()).padStart(2, '0')}`;
-            this.selectedMembers.forEach(id => {
-                const amount = this.getUnitPrice();
-                const payment = { id: this.generateId(), memberId: id, amount, date: new Date().toISOString(), monthKey };
-                this.payments.push(payment);
-            });
-            this.savePayments();
-            this.showNotification('Paiements ajoutés pour les membres sélectionnés', 'success');
-            this.selectedMembers.clear();
-            localStorage.setItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
-            this.renderMembers();
+            const pad = (n) => String(n).padStart(2, '0');
+            const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jui', 'Jui', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+
+            const months = [];
+            for (let i = 0; i < 12; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const y = d.getFullYear();
+                const m = pad(d.getMonth());
+                const label = `${monthNames[d.getMonth()]} ${y}`;
+                months.push({ key: `${y}-${m}`, label });
+            }
+
+            // build members table rows
+            const selectedMembersArray = Array.from(this.selectedMembers).map(id => this.members.find(m => String(m.id) === String(id))).filter(Boolean);
+
+            const membersRowsHtml = selectedMembersArray.map(m => `
+                <tr data-member-id="${m.id}">
+                    <td style="padding:6px 8px">${m.name}</td>
+                    <td style="padding:6px 8px;text-align:right"><input type="number" class="override-amount" data-member-id="${m.id}" step="0.01" style="width:110px" placeholder="Montant" /></td>
+                </tr>
+            `).join('');
+
+            const monthsHtml = months.map((mo, idx) => `
+                <label style="display:block;margin:4px 0;"><input type="checkbox" class="bulk-month-checkbox" value="${mo.key}" ${idx===0? 'checked' : ''}/> ${mo.label}</label>
+            `).join('');
+
+            const modalContent = `
+                <div class="bulk-pay-advanced" style="display:flex;gap:12px;">
+                    <div style="flex:0 0 280px">
+                        <h4>Sélectionner les mois</h4>
+                        <div style="max-height:260px;overflow:auto;border:1px solid #eee;padding:8px;margin-bottom:8px;">${monthsHtml}</div>
+                        <label>Montant global (laisser vide pour utiliser le prix unitaire):<br><input id="bulkPayAmountGlobal" type="number" step="0.01" style="width:140px;margin-top:6px" /></label>
+                        <div style="margin-top:8px">
+                            <label><input type="radio" name="bulkMode" value="skip" checked/> Ne pas dupliquer (skip)</label><br>
+                            <label><input type="radio" name="bulkMode" value="replace"/> Remplacer existants</label><br>
+                            <label><input type="radio" name="bulkMode" value="duplicate"/> Créer doublons</label>
+                        </div>
+                        <div style="margin-top:12px">
+                            <button class="btn btn-secondary" onclick="paymentManager.closeModal()">Annuler</button>
+                            <button class="btn btn-info" id="bulkPreviewBtn">Aperçu</button>
+                        </div>
+                    </div>
+                    <div style="flex:1;min-width:360px">
+                        <h4>Aperçu et overrides</h4>
+                        <div style="max-height:300px;overflow:auto;border:1px solid #eee;padding:8px;margin-bottom:8px;">
+                            <table style="width:100%;border-collapse:collapse"> 
+                                <thead><tr><th style="text-align:left">Membre</th><th style="text-align:right">Montant (override)</th></tr></thead>
+                                <tbody id="bulkMembersTable">${membersRowsHtml}</tbody>
+                            </table>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <div><strong id="bulkPreviewInfo">0 paiements - Total: 0</strong></div>
+                            <div>
+                                <button class="btn btn-primary" id="confirmBulkPayAdvanced">Confirmer</button>
+                            </div>
+                        </div>
+                        <div id="bulkProgress" style="display:none;margin-top:8px">
+                            <div style="background:#eee;height:12px;border-radius:6px;overflow:hidden"><div id="bulkProgressBar" style="height:12px;background:#27AE60;width:0%"></div></div>
+                            <div id="bulkProgressText" style="font-size:0.85em;margin-top:6px"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            this.showModal('Paiement en masse avancé', modalContent);
+
+            setTimeout(() => {
+                const getSelectedMonths = () => Array.from(document.querySelectorAll('.bulk-month-checkbox:checked')).map(i => i.value);
+                const getGlobalAmount = () => { const v = document.getElementById('bulkPayAmountGlobal'); return v && v.value ? parseFloat(v.value) : null; };
+                const getMode = () => { const r = document.querySelector('input[name="bulkMode"]:checked'); return r ? r.value : 'skip'; };
+
+                const computePreview = () => {
+                    const months = getSelectedMonths();
+                    const globalAmt = getGlobalAmount();
+                    let total = 0; let count = 0;
+                    const rows = Array.from(document.querySelectorAll('.override-amount'));
+                    rows.forEach(r => {
+                        const id = r.dataset.memberId; const val = r.value ? parseFloat(r.value) : null;
+                        const amt = val != null && !isNaN(val) ? val : (globalAmt != null && !isNaN(globalAmt) ? globalAmt : this.getUnitPrice());
+                        count += months.length;
+                        total += amt * months.length;
+                    });
+                    const info = document.getElementById('bulkPreviewInfo');
+                    if (info) info.textContent = `${count} paiements - Total: ${this.formatCurrency(total)}`;
+                };
+
+                document.getElementById('bulkPreviewBtn').addEventListener('click', () => computePreview());
+
+                // update preview when inputs change
+                document.getElementById('bulkMembersTable').addEventListener('input', () => computePreview());
+                document.querySelectorAll('.bulk-month-checkbox, #bulkPayAmountGlobal').forEach(el => el.addEventListener('change', () => computePreview()));
+
+                // month checkboxes only update preview; apply is done via 'Aperçu' + 'Confirmer'
+
+                // initial preview
+                computePreview();
+
+                const confirmBtn = document.getElementById('confirmBulkPayAdvanced');
+                confirmBtn.addEventListener('click', async () => {
+                    const months = getSelectedMonths();
+                    if (months.length === 0) return this.showNotification('Aucun mois sélectionné', 'error');
+                    const mode = getMode();
+                    const globalAmt = getGlobalAmount();
+
+                    const memberInputs = Array.from(document.querySelectorAll('.override-amount')).map(i => ({ id: i.dataset.memberId, val: i.value ? parseFloat(i.value) : null }));
+
+                    const tasks = [];
+                    selectedMembersArray.forEach(m => {
+                        const override = memberInputs.find(mi => String(mi.id) === String(m.id));
+                        const baseAmt = override && override.val != null && !isNaN(override.val) ? override.val : (globalAmt != null && !isNaN(globalAmt) ? globalAmt : this.getUnitPrice());
+                        months.forEach(monthKey => {
+                            tasks.push({ memberId: String(m.id), monthKey, amount: baseAmt });
+                        });
+                    });
+
+                    // process with progress
+                    const progressEl = document.getElementById('bulkProgress');
+                    const progressBar = document.getElementById('bulkProgressBar');
+                    const progressText = document.getElementById('bulkProgressText');
+                    if (progressEl) progressEl.style.display = 'block';
+
+                    for (let i = 0; i < tasks.length; i++) {
+                        const t = tasks[i];
+                        const existsIdx = this.payments.findIndex(p => p.memberId === t.memberId && p.monthKey === t.monthKey);
+                        if (existsIdx !== -1) {
+                            if (mode === 'skip') {
+                                // skip
+                            } else if (mode === 'replace') {
+                                this.payments[existsIdx].amount = t.amount;
+                                this.payments[existsIdx].date = new Date().toISOString();
+                            } else if (mode === 'duplicate') {
+                                this.payments.push({ id: this.generateId(), memberId: t.memberId, amount: t.amount, date: new Date().toISOString(), monthKey: t.monthKey });
+                            }
+                        } else {
+                            this.payments.push({ id: this.generateId(), memberId: t.memberId, amount: t.amount, date: new Date().toISOString(), monthKey: t.monthKey });
+                        }
+
+                        const pct = Math.round(((i+1)/tasks.length)*100);
+                        if (progressBar) progressBar.style.width = pct + '%';
+                        if (progressText) progressText.textContent = `${i+1} / ${tasks.length} traités`;
+                        // allow UI to update
+                        await new Promise(r => setTimeout(r, 10));
+                    }
+
+                    this.savePayments();
+                    this.showNotification('Paiements en masse traités', 'success');
+                    this.selectedMembers.clear();
+                    safeSetItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+                    this.closeModal();
+                    this.renderMembers();
+                });
+            }, 100);
         });
 
         const bulkMarkSoldSelected = document.getElementById('bulkMarkSoldSelected');
@@ -1047,7 +1335,7 @@ document.querySelectorAll('.modal-tab').forEach(tab => {
             this.saveMembers();
             this.showNotification('Membres marqués soldés', 'success');
             this.selectedMembers.clear();
-            localStorage.setItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+            safeSetItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
             this.renderMembers();
         });
 
@@ -1105,25 +1393,34 @@ setupMemberEventListeners() {
     const membersGrid = document.getElementById('membersGrid');
 
     membersGrid.addEventListener('click', (e) => {
-        e.preventDefault();
+        const target = e.target;
 
-        if (e.target.matches('.member-add-payment')) {
-            const memberId = e.target.dataset.memberId;
+        if (target.matches('.member-add-payment')) {
+            e.preventDefault();
+            const memberId = target.dataset.memberId;
             this.showAddPaymentModal(memberId);
+            return;
         }
 
-        if (e.target.matches('.member-edit')) {
-            const memberId = e.target.dataset.memberId;
+        if (target.matches('.member-edit')) {
+            e.preventDefault();
+            const memberId = target.dataset.memberId;
             this.showEditMemberModal(memberId);
+            return;
         }
 
-        if (e.target.matches('.member-delete')) {
-            const memberId = e.target.dataset.memberId;
+        if (target.matches('.member-delete')) {
+            e.preventDefault();
+            const memberId = target.dataset.memberId;
             if (confirm('Êtes-vous sûr de vouloir supprimer ce membre ?')) {
                 this.deleteMember(memberId);
             }
+            return;
         }
+        // Do not call preventDefault() for other clicks (e.g. checkboxes)
     });
+    // Ensure selection delegation is attached once
+    this.attachSelectionDelegation();
 }
 
     switchTab(tabName) {
@@ -1316,8 +1613,8 @@ actions.push({
     renderMembersListView(filteredMembers) {
         const container = document.getElementById('membersGrid');
         if (!this.selectedMembers) {
-            const stored = localStorage.getItem('selectedMembers');
-            this.selectedMembers = stored ? new Set(JSON.parse(stored)) : new Set();
+            const stored = safeGetItem('selectedMembers');
+            this.selectedMembers = stored ? new Set(JSON.parse(stored).map(String)) : new Set();
         }
 
         if (!this.memberSort) {
@@ -1491,7 +1788,7 @@ actions.push({
 
             html += `
                 <tr class="member-row" data-member-id="${member.id}">
-                    <td class="cell-select"><input type="checkbox" class="member-select" data-member-id="${member.id}" ${isSelected ? 'checked' : ''}></td>
+                    <td class="cell-select"><input type="checkbox" class="member-select" data-member-id="${member.id}" ${this.selectedMembers.has(String(member.id)) ? 'checked' : ''}></td>
                     <td class="cell-name member-name-clickable" style="font-weight: 600; cursor: pointer; color: #181818;" data-member-id="${member.id}" title="Cliquez pour voir les détails">
                         ${showBell ? `<i class="fas fa-bell" style="color: #E74C3C; margin-right: 5px;" title="${unpaidMonthsCount} mois impayé${unpaidMonthsCount > 1 ? 's' : ''}"></i>` : ''}
                         ${member.name}
@@ -1579,26 +1876,20 @@ actions.push({
         });
         
         // Sélection lignes
+        // Re-attach handlers for table view selection (select-all + per-row)
         const updateStoredSelection = () => {
-            localStorage.setItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+            safeSetItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
+            const bulkActions = document.getElementById('bulkExportMembers') || document.getElementById('membersBulkActions');
+            const bar = document.getElementById('membersBulkActions');
+            if (bar) bar.style.display = this.selectedMembers.size > 0 ? 'flex' : 'none';
         };
 
-        const checkboxes = container.querySelectorAll('.member-select');
-        checkboxes.forEach(cb => {
-            cb.addEventListener('change', () => {
-                const id = cb.dataset.memberId;
-                if (cb.checked) {
-                    this.selectedMembers.add(id);
-                } else {
-                    this.selectedMembers.delete(id);
-                }
-                updateStoredSelection();
-                this.renderMembersListView(filteredMembers);
-            });
-        });
+        // Sync UI checkboxes/rows from stored selection after rendering
+        this.updateSelectionUI();
 
         const selectAll = container.querySelector('#selectAllMembers');
         if (selectAll) {
+            selectAll.checked = tableCheckboxes.length > 0 && Array.from(tableCheckboxes).every(c => c.checked);
             selectAll.addEventListener('change', () => {
                 if (selectAll.checked) {
                     sortedMembers.forEach(m => this.selectedMembers.add(String(m.id)));
@@ -1884,7 +2175,7 @@ actions.push({
             `;
         }).join('');
         
-        // Ajouter les événements pour les boutons PDF membre
+        // Binder les boutons PDF (proprement) et synchroniser l'UI de sélection
         setTimeout(() => {
             document.querySelectorAll('.member-pdf-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -1893,30 +2184,14 @@ actions.push({
                     this.generateMemberDetailedReport(memberId);
                 });
             });
-
-            // Checkbox handlers for card view
-            const updateStoredSelection = () => {
-                localStorage.setItem('selectedMembers', JSON.stringify(Array.from(this.selectedMembers)));
-                const bulkActions = document.getElementById('membersBulkActions');
-                if (bulkActions) bulkActions.style.display = this.selectedMembers.size > 0 ? 'flex' : 'none';
-                const selectAllGlobal = document.getElementById('selectAllMembersGlobal');
-                if (selectAllGlobal) selectAllGlobal.checked = false;
-            };
-
-            document.querySelectorAll('.member-select-checkbox').forEach(cb => {
-                cb.addEventListener('change', (e) => {
-                    const id = cb.dataset.memberId;
-                    if (cb.checked) this.selectedMembers.add(id); else this.selectedMembers.delete(id);
-                    updateStoredSelection();
-                    // re-render list to update counters / states
-                    // If in list-view, the list renderer manages its own selection UI
-                });
-            });
+            // After rendering, ensure checkboxes/rows reflect stored selection
+            this.updateSelectionUI();
         }, 100);
         const bulkActions = document.getElementById('membersBulkActions');
         if (bulkActions) bulkActions.style.display = this.selectedMembers.size > 0 ? 'flex' : 'none';
         const selectAllGlobal = document.getElementById('selectAllMembersGlobal');
         if (selectAllGlobal) selectAllGlobal.checked = false;
+        this.attachGlobalAscendingSortHandlers();
     }
 
     applyMemberSort(members) {
@@ -2625,6 +2900,7 @@ async exportMemberToPDF(memberId) {
                 </div>
             `;
         }).join('');
+        this.attachGlobalAscendingSortHandlers();
     }
 
 showLotDetails(lotId) {
@@ -2708,7 +2984,12 @@ showLotDetails(lotId) {
 
     this.renderLotMembersNew(membersWithLot, lot);
 
-    document.getElementById('lotDetailsModal').classList.add('active');
+    const _lotDetailsModal = document.getElementById('lotDetailsModal');
+    if (_lotDetailsModal) {
+        try { window._lastScrollY = window.scrollY || window.pageYOffset || 0; } catch (e) {}
+        _lotDetailsModal.classList.add('active');
+        try { document.body.classList.add('modal-open'); } catch (e) {}
+    }
 }
 
 closeLotDetailsModal() {
@@ -2749,7 +3030,12 @@ populateLotMembers(members) {
 }
 
 closeLotDetailsModal() {
-    document.getElementById('lotDetailsModal').classList.remove('active');
+    const _lotDetailsModal = document.getElementById('lotDetailsModal');
+    if (_lotDetailsModal) {
+        _lotDetailsModal.classList.remove('active');
+        try { document.body.classList.remove('modal-open'); } catch (e) {}
+        try { const y = window._lastScrollY || 0; window.scrollTo({ top: y, behavior: 'smooth' }); window._lastScrollY = null; } catch (e) {}
+    }
 
     document.querySelectorAll('.modal-tab').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.lot-tab-content').forEach(content => content.classList.remove('active'));
@@ -2760,7 +3046,7 @@ closeLotDetailsModal() {
         const container = document.getElementById('lotsGrid');
         if (!this.selectedLots) {
             const stored = localStorage.getItem('selectedLots');
-            this.selectedLots = stored ? new Set(JSON.parse(stored)) : new Set();
+            this.selectedLots = stored ? new Set(JSON.parse(stored).map(String)) : new Set();
         }
         if (!this.lotSort) {
             const savedKey = localStorage.getItem('lotSortKey') || 'name';
@@ -3032,10 +3318,12 @@ closeLotDetailsModal() {
         `;
         
         container.innerHTML = html;
+        this.attachGlobalAscendingSortHandlers();
     }
 
 async exportLotToPDF(lotId) {
     try {
+        this.showLoader('Génération du rapport lot...');
         const lot = this.lots.find(l => l.id === lotId || l.name === lotId);
         if (!lot) { this.showNotification('Lot introuvable', 'error'); return; }
 
@@ -3159,10 +3447,12 @@ async exportLotToPDF(lotId) {
         heightLeft -= pageHeight;
         while (heightLeft >= 0) { position = heightLeft - imgHeight; pdf.addPage(); pdf.addImage(img,'PNG',0,position,imgWidth,imgHeight); heightLeft -= pageHeight; }
         pdf.save(`Rapport_Lot_${lot.name.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
+        this.hideLoader();
         this.showNotification('Rapport lot généré', 'success');
 
     } catch (err) {
         console.error(err);
+        try { this.hideLoader(); } catch(e){}
         this.showNotification('Erreur génération rapport lot', 'error');
     }
 }
@@ -3927,12 +4217,33 @@ async generatePaymentReceipt(payment, member, monthsCovered) {
     showModal(title, content) {
         document.getElementById('modalTitle').textContent = title;
         document.getElementById('modalContent').innerHTML = content;
-        document.getElementById('modalOverlay').classList.add('active');
+        const overlay = document.getElementById('modalOverlay');
+        const modalEl = document.getElementById('modal');
+        // Save current scroll so we can restore it on close
+        try { window._lastScrollY = window.scrollY || window.pageYOffset || 0; } catch (e) {}
+        // Ensure overlay is visible
+        overlay.classList.add('active');
+        // Prevent background from scrolling
+        try { document.body.classList.add('modal-open'); } catch (e) {}
+        // Make modal focusable and focus it without scrolling the viewport
+        if (modalEl) {
+            modalEl.setAttribute('tabindex', '-1');
+            try { modalEl.focus({ preventScroll: true }); } catch (e) { modalEl.focus(); }
+        }
+        // Small timeout to ensure layout settled then center overlay content
+        setTimeout(() => {
+            if (modalEl && typeof modalEl.scrollIntoView === 'function') {
+                modalEl.scrollIntoView({ block: 'center', inline: 'center', behavior: 'auto' });
+            }
+        }, 20);
     }
 
     closeModal() {
         const modal = document.getElementById('modalOverlay');
         modal.classList.remove('active');
+        try { document.body.classList.remove('modal-open'); } catch (e) {}
+        // Restore previous scroll position smoothly
+        try { const y = window._lastScrollY || 0; window.scrollTo({ top: y, behavior: 'smooth' }); window._lastScrollY = null; } catch (e) {}
         
         // Réinitialiser tous les formulaires dans la modal
         const forms = modal.querySelectorAll('form');
@@ -4288,14 +4599,22 @@ addMember(memberData) {
         document.getElementById('editLotPrice').value = lot.price;
         document.getElementById('editLotPrice').focus();
 
-        modal.classList.add('active');
+        if (modal) {
+            try { window._lastScrollY = window.scrollY || window.pageYOffset || 0; } catch (e) {}
+            modal.classList.add('active');
+            try { document.body.classList.add('modal-open'); } catch (e) {}
+        }
 
         const saveBtn = document.getElementById('editLotPriceSaveBtn');
         const cancelBtn = document.getElementById('editLotPriceCancelBtn');
         const closeBtn = document.getElementById('editLotPriceClose');
 
         const cleanup = () => {
-            modal.classList.remove('active');
+            if (modal) {
+                modal.classList.remove('active');
+                try { document.body.classList.remove('modal-open'); } catch (e) {}
+                try { const y = window._lastScrollY || 0; window.scrollTo({ top: y, behavior: 'smooth' }); window._lastScrollY = null; } catch (e) {}
+            }
             saveBtn.removeEventListener('click', handleSave);
             cancelBtn.removeEventListener('click', handleCancel);
             closeBtn.removeEventListener('click', handleCancel);
@@ -5810,25 +6129,73 @@ function initQuickActions() {
 
 // Export Excel amélioré
 function exportAllDataToExcel() {
+    // Vérifier que la librairie XLSX est disponible
+    if (typeof XLSX === 'undefined') {
+        const msg = 'La librairie XLSX n\'est pas chargée. Vérifiez la connexion internet ou placez xlsx.full.min.js dans /libs.';
+        console.error(msg);
+        if (window.paymentManager && typeof window.paymentManager.showNotification === 'function') {
+            window.paymentManager.showNotification(msg, 'error');
+        } else {
+            alert(msg);
+        }
+        return;
+    }
+
     try {
         const wb = XLSX.utils.book_new();
         
-        // Feuille Membres
-        const membersData = window.paymentManager.members.map(m => {
-            const payments = window.paymentManager.payments.filter(p => p.memberId === m.id);
-            const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-            
-            return {
-                'Nom': m.name,
-                'Téléphone': m.phone || 'N/A',
-                'Quota Mensuel': m.monthlyQuota || 0,
-                'Durée (mois)': m.duration || 0,
-                'Total Payé': totalPaid,
-                'Date d\'ajout': new Date(m.createdAt).toLocaleDateString('fr-FR')
+        // Feuille Membres — remplaçant: plage Juillet 2025 → Juin 2026 avec en-têtes fournis
+        const start = new Date(2025, 6, 1); // juillet 2025
+        const monthsRange = [];
+        for (let i = 0; i < 12; i++) {
+            const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
+            const label = d.toLocaleString('fr-FR', { month: 'long' }) + ' ' + d.getFullYear();
+            monthsRange.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: label.charAt(0).toLowerCase() + label.slice(1) });
+        }
+
+        const membersData = window.paymentManager.members.map((m, idx) => {
+            const memberPayments = window.paymentManager.payments.filter(p => String(p.memberId) === String(m.id));
+
+            const monthAmounts = monthsRange.map(mm => {
+                let sum = 0;
+                for (const p of memberPayments) {
+                    if (!p) continue;
+                    if (p.month === mm.key || p.monthKey === mm.key) { sum += Number(p.amount || 0); continue; }
+                    if (p.date) {
+                        const pd = new Date(p.date);
+                        const k = `${pd.getFullYear()}-${String(pd.getMonth() + 1).padStart(2, '0')}`;
+                        if (k === mm.key) sum += Number(p.amount || 0);
+                    }
+                }
+                return sum;
+            });
+
+            const totalPaid = monthAmounts.reduce((s, v) => s + v, 0);
+            const nbreLots = Number(m.numberOfLots || 0);
+            const unit = Number(m.monthlyQuota || 0) || (typeof window.paymentManager.getUnitPrice === 'function' ? Number(window.paymentManager.getUnitPrice()) : 0);
+            const expectedTotal = (unit || 0) * 12;
+            const reste = Math.max(0, expectedTotal - totalPaid);
+            const statut = reste <= 0 ? 'Soldé' : 'En attente';
+
+            const row = {
+                'n°': idx + 1,
+                'nom client': m.name || '',
+                'nbre lot': nbreLots
             };
+
+            monthsRange.forEach((mm, i) => {
+                row[mm.label] = monthAmounts[i];
+            });
+
+            row['montannt verse'] = totalPaid;
+            row['reste a payer'] = reste;
+            row['statut'] = statut;
+
+            return row;
         });
-        const membersSheet = XLSX.utils.json_to_sheet(membersData);
-        XLSX.utils.book_append_sheet(wb, membersSheet, 'Membres');
+
+        const membersSheet = XLSX.utils.json_to_sheet(membersData, {skipHeader: false});
+        XLSX.utils.book_append_sheet(wb, membersSheet, 'Membres_Plages');
         
         // Feuille Paiements
         const paymentsData = window.paymentManager.payments.map(p => {
@@ -5855,7 +6222,111 @@ function exportAllDataToExcel() {
         }));
         const lotsSheet = XLSX.utils.json_to_sheet(lotsData);
         XLSX.utils.book_append_sheet(wb, lotsSheet, 'Lots');
-        
+        // Appliquer styles et couleurs aux feuilles (en-têtes + statut)
+        const styleHeaders = (sheet, headerBg = 'FFCC00', headerFont = '000000') => {
+            if (!sheet || !sheet['!ref']) return;
+            const range = XLSX.utils.decode_range(sheet['!ref']);
+            // définir largeurs de colonne par défaut
+            sheet['!cols'] = new Array(range.e.c + 1).fill({ wpx: 110 });
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const addr = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+                const cell = sheet[addr];
+                if (cell) {
+                    cell.s = cell.s || {};
+                    cell.s.fill = { fgColor: { rgb: headerBg } };
+                    cell.s.font = Object.assign({}, cell.s.font || {}, { bold: true, color: { rgb: headerFont } });
+                    cell.s.alignment = Object.assign({}, cell.s.alignment || {}, { horizontal: 'center', vertical: 'center' });
+                }
+            }
+        };
+
+        // Coloration conditionnelle pour la colonne 'statut' dans la feuille Membres_Plages
+        const applyStatusColors = (sheet) => {
+            if (!sheet || !sheet['!ref']) return;
+            const range = XLSX.utils.decode_range(sheet['!ref']);
+            // Trouver l'index de la colonne 'statut' sur la première ligne
+            let statutCol = -1;
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const addr = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+                const cell = sheet[addr];
+                if (cell && String(cell.v).toLowerCase().trim() === 'statut') {
+                    statutCol = C;
+                    break;
+                }
+            }
+            if (statutCol === -1) return;
+
+            for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                const addr = XLSX.utils.encode_cell({ r: R, c: statutCol });
+                const cell = sheet[addr];
+                if (!cell) continue;
+                const val = String(cell.v || '').toLowerCase();
+                cell.s = cell.s || {};
+                if (val === 'soldé' || val === 'solde' || val === 'solde') {
+                    cell.s.fill = { fgColor: { rgb: 'C6EFCE' } }; // vert clair
+                    cell.s.font = Object.assign({}, cell.s.font || {}, { color: { rgb: '006100' }, bold: true });
+                } else {
+                    cell.s.fill = { fgColor: { rgb: 'FFD966' } }; // orange clair
+                    cell.s.font = Object.assign({}, cell.s.font || {}, { color: { rgb: '7F6000' }, bold: true });
+                }
+                cell.s.alignment = Object.assign({}, cell.s.alignment || {}, { horizontal: 'center' });
+            }
+        };
+
+        // Appliquer aux feuilles
+        try {
+            // En-têtes et statut déjà gérés, ajouter bandes alternées et coloration des montants
+            const applyTableColors = (sheet) => {
+                if (!sheet || !sheet['!ref']) return;
+                const range = XLSX.utils.decode_range(sheet['!ref']);
+                // Bandes alternées pour les lignes (gris léger)
+                for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                    const isEven = (R - range.s.r) % 2 === 0;
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                        const addr = XLSX.utils.encode_cell({ r: R, c: C });
+                        const cell = sheet[addr];
+                        if (!cell) continue;
+                        cell.s = cell.s || {};
+                        if (isEven) {
+                            // Lignes alternées : bleu pâle
+                            cell.s.fill = Object.assign({}, cell.s.fill || {}, { fgColor: { rgb: 'EAF4FF' } });
+                        }
+                    }
+                }
+
+                // Colorer les cellules de montants (colonnes numériques) en vert clair si >0
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    // heuristique : si la colonne a un en-tête contenant 'mont' ou mois, on la traite
+                    const headerAddr = XLSX.utils.encode_cell({ r: range.s.r, c: C });
+                    const headerCell = sheet[headerAddr];
+                    const headerText = headerCell ? String(headerCell.v || '').toLowerCase() : '';
+                    if (headerText.includes('mont') || /\b\d{4}\b/.test(headerText) || headerText.match(/janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre/)) {
+                        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                            const addr = XLSX.utils.encode_cell({ r: R, c: C });
+                            const cell = sheet[addr];
+                            if (!cell) continue;
+                            const num = Number(cell.v);
+                            if (!isNaN(num) && num > 0) {
+                                cell.s = cell.s || {};
+                                // Montants > 0 : fond vert très clair + texte vert foncé
+                                cell.s.fill = Object.assign({}, cell.s.fill || {}, { fgColor: { rgb: 'DFF4DF' } });
+                                cell.s.font = Object.assign({}, cell.s.font || {}, { color: { rgb: '006400' } });
+                                cell.s.alignment = Object.assign({}, cell.s.alignment || {}, { horizontal: 'right' });
+                            }
+                        }
+                    }
+                }
+            };
+
+            styleHeaders(membersSheet, 'FFCC00', '000000');
+            applyStatusColors(membersSheet);
+            applyTableColors(membersSheet);
+            styleHeaders(paymentsSheet, 'B4C6E7', '000000');
+            styleHeaders(lotsSheet, 'E6F2FF', '000000');
+        } catch (e) {
+            console.warn('Impossible d\'appliquer les styles Excel :', e);
+        }
+
         const fileName = `SIMMO_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
         XLSX.writeFile(wb, fileName);
         
@@ -5866,6 +6337,122 @@ function exportAllDataToExcel() {
         console.error('Erreur export Excel:', error);
         if (window.paymentManager) {
             window.paymentManager.showNotification('Erreur lors de l\'export', 'error');
+        }
+    }
+}
+
+// Export CSV personnalisé pour l'onglet Dashboard — en-têtes fournis par l'utilisateur
+function exportMembersCsvForDashboard() {
+    const manager = window.paymentManager;
+    if (!manager) return;
+
+    // Période demandée : Juillet 2025 -> Juin 2026 (12 mois)
+    const start = new Date(2025, 6, 1); // juillet 2025 (month index 6)
+    const months = [];
+    for (let i = 0; i < 12; i++) {
+        const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const label = d.toLocaleString('fr-FR', { month: 'long' }) + ' ' + y;
+        const key = `${y}-${m}`;
+        months.push({ key, label });
+    }
+
+    // En-têtes demandés (ordre exact) :
+    const headers = [
+        'n°',
+        'nom client',
+        'nbre lot',
+        // mois individuels
+        ...months.map(m => m.label.charAt(0).toLowerCase() + m.label.slice(1)),
+        'montannt verse',
+        'reste a payer',
+        'statut'
+    ];
+
+    // Construire lignes
+    const lines = [];
+    lines.push(headers.join(';'));
+
+    manager.members.forEach((m, idx) => {
+        const memberPayments = manager.payments.filter(p => String(p.memberId) === String(m.id));
+
+        // Calcul montant payé par mois (pour la période)
+        const monthAmounts = months.map(mm => {
+            // Cherche paiements correspondant au key (ex: '2025-07') ou par date
+            let sum = 0;
+            for (const p of memberPayments) {
+                if (!p) continue;
+                if (p.month === mm.key || p.monthKey === mm.key) {
+                    sum += Number(p.amount || 0);
+                    continue;
+                }
+                // fallback : comparer date
+                if (p.date) {
+                    const pd = new Date(p.date);
+                    const k = `${pd.getFullYear()}-${String(pd.getMonth() + 1).padStart(2, '0')}`;
+                    if (k === mm.key) sum += Number(p.amount || 0);
+                }
+            }
+            return sum;
+        });
+
+        const totalPaid = monthAmounts.reduce((s, v) => s + v, 0);
+
+        // Estimation attendu : utiliser monthlyQuota si présent sinon unit price * nbre lots
+        const nbreLots = Number(m.numberOfLots || 0);
+        const unit = Number(m.monthlyQuota || 0) || (typeof window.paymentManager.getUnitPrice === 'function' ? Number(window.paymentManager.getUnitPrice()) : 0);
+        const expectedTotal = (unit || 0) * 12; // sur la période 12 mois
+        const reste = Math.max(0, expectedTotal - totalPaid);
+        const statut = reste <= 0 ? 'Soldé' : 'En attente';
+
+        // Préparer colonnes (format simple, point décimal en FR -> garder entier/float)
+        const row = [];
+        row.push(String(idx + 1));
+        row.push((m.name || '').replace(/;/g, ','));
+        row.push(String(nbreLots));
+        monthAmounts.forEach(a => row.push(String(a || '')));
+        row.push(String(totalPaid));
+        row.push(String(reste));
+        row.push(String(statut));
+
+        lines.push(row.join(';'));
+    });
+
+    const bom = '\uFEFF'; // BOM pour Excel/UTF-8
+    const csvContent = bom + lines.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const fileName = `Membres_Plages_2025-07_2026-06_${new Date().toISOString().split('T')[0]}.csv`;
+
+    // Téléchargement avec fallback et nettoyage
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.style.display = 'none';
+    link.href = downloadUrl;
+    link.setAttribute('download', fileName);
+
+    try {
+        // IE / old Edge
+        if (navigator.msSaveOrOpenBlob) {
+            navigator.msSaveOrOpenBlob(blob, fileName);
+        } else {
+            document.body.appendChild(link);
+            // Le click ici doit être appelé pendant un geste utilisateur sinon certains navigateurs bloquent
+            link.click();
+            document.body.removeChild(link);
+            // Revoquer l'URL après un court délai
+            setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        }
+
+        if (window.paymentManager && typeof window.paymentManager.showNotification === 'function') {
+            window.paymentManager.showNotification('Export CSV préparé pour téléchargement.', 'success');
+        }
+    } catch (err) {
+        console.error('Erreur lors du téléchargement CSV :', err);
+        if (window.paymentManager && typeof window.paymentManager.showNotification === 'function') {
+            window.paymentManager.showNotification('Échec du téléchargement. Vérifiez les autorisations.', 'error');
+        } else {
+            alert('Échec du téléchargement. Vérifiez les autorisations du navigateur.');
         }
     }
 }

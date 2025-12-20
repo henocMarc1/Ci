@@ -11,8 +11,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="this.onerror=null;this.src='libs/xlsx.full.min.js'"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" onerror="this.onerror=null;this.src='libs/chart.min.js'"></script>
 <!-- Firebase Compat -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -92,15 +92,23 @@ firebase.auth().onAuthStateChanged(function(user) {
 </script>
 
 <!-- Scripts chargés à la fin du body pour éviter les erreurs -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" onerror="this.onerror=null;this.src='libs/jspdf.umd.min.js'"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" onerror="this.onerror=null;this.src='libs/html2canvas.min.js'"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" onerror="this.onerror=null;this.src='libs/jspdf.plugin.autotable.min.js'"></script>
 <link rel="stylesheet" href="styles.mobile.css"> 
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 </head>
 <body>
+    <div id="globalLoader" class="global-loader hidden" role="status" aria-live="polite">
+        <div class="global-loader-backdrop"></div>
+        <div class="global-loader-content">
+            <div class="spinner" aria-hidden="true"></div>
+            <div class="loader-message">Chargement...</div>
+        </div>
+    </div>
+
     <div class="app-container">
 <header class="header">
     <div class="header-content">
@@ -380,6 +388,37 @@ firebase.auth().onAuthStateChanged(function(user) {
         </div>
     </div>
 </div>
+<!-- Vérification des bibliothèques chargées -->
+<script>
+    (function(){
+        const missing = [];
+        if (!window.XLSX) missing.push('XLSX');
+        if (!window.Chart && !window.ChartJS && !window.ChartLib) missing.push('Chart.js');
+        if (!window.jspdf && !window.jsPDF) missing.push('jsPDF');
+        if (!window.html2canvas) missing.push('html2canvas');
+        if (missing.length > 0) {
+            const msg = 'Bibliothèques manquantes : ' + missing.join(', ') + '. Vérifiez la connexion ou placez les fichiers dans /libs et rechargez.';
+            console.warn(msg);
+            if (window.paymentManager && typeof window.paymentManager.showNotification === 'function') {
+                window.paymentManager.showNotification(msg, 'error');
+            } else {
+                // Message non intrusif en bas de page
+                const el = document.createElement('div');
+                el.style.position = 'fixed';
+                el.style.left = '12px';
+                el.style.bottom = '12px';
+                el.style.background = '#ffe6e6';
+                el.style.color = '#800000';
+                el.style.padding = '10px 14px';
+                el.style.border = '1px solid #ffcccc';
+                el.style.borderRadius = '6px';
+                el.style.zIndex = 99999;
+                el.textContent = msg;
+                document.body.appendChild(el);
+            }
+        }
+    })();
+</script>
 
 <!-- Modal des détails du lot -->
 <div class="modal-overlay" id="lotDetailsModal">
@@ -482,8 +521,8 @@ firebase.auth().onAuthStateChanged(function(user) {
                             </label>
                             <button class="btn btn-secondary" id="bulkExportSelected">Exporter</button>
                             <button class="btn btn-danger" id="bulkDeleteSelected">Supprimer</button>
-                            <button class="btn btn-primary" id="bulkMarkPaidSelected">Marquer payé</button>
-                            <button class="btn btn-secondary" id="bulkMarkSoldSelected">Marquer soldé</button>
+                            <button class="btn btn-primary" id="bulkMarkPaidSelected" style="display:none">Marquer payé</button>
+                            
                         </div>
                     </div>
                 </div>
@@ -858,14 +897,16 @@ firebase.auth().onAuthStateChanged(function(user) {
 
     <script src="script.js"></script>
     <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js', { scope: './' })
-    .then(reg => {
-      console.log('Service worker enregistré.');
-    })
-    .catch(err => {
-      console.error('Échec enregistrement SW :', err);
-    });
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')) {
+    navigator.serviceWorker.register('service-worker.js', { scope: './' })
+        .then(reg => {
+            console.log('Service worker enregistré.');
+        })
+        .catch(err => {
+            console.error('Échec enregistrement SW :', err);
+        });
+} else {
+    console.log('Service Worker registration skipped: not running on http(s).');
 }
 </script>
 <script>
@@ -897,16 +938,18 @@ window.addEventListener('beforeinstallprompt', (e) => {
   });
 });
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('service-worker.js')
-      .then(registration => {
-        console.log('Service Worker enregistré avec succès:', registration);
-      })
-      .catch(error => {
-        console.log('Échec de l\'enregistrement du Service Worker:', error);
-      });
-  });
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js')
+            .then(registration => {
+                console.log('Service Worker enregistré avec succès:', registration);
+            })
+            .catch(error => {
+                console.log('Échec de l\'enregistrement du Service Worker:', error);
+            });
+    });
+} else {
+    console.log('Skipping Service Worker on non-http(s) protocol.');
 }
 
 window.addEventListener('load', () => {
