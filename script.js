@@ -1889,6 +1889,7 @@ actions.push({
 
         const selectAll = container.querySelector('#selectAllMembers');
         if (selectAll) {
+            const tableCheckboxes = container.querySelectorAll('.member-select, .member-select-checkbox');
             selectAll.checked = tableCheckboxes.length > 0 && Array.from(tableCheckboxes).every(c => c.checked);
             selectAll.addEventListener('change', () => {
                 if (selectAll.checked) {
@@ -1948,46 +1949,63 @@ actions.push({
     }
 
     setupTableActions() {
-        // Gestion du menu déroulant
-        document.querySelectorAll('.action-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+        // Utiliser une délégation d'événements (attachée une seule fois)
+        if (this._actionMenusDelegated) return;
+        this._actionMenusDelegated = true;
+
+        document.addEventListener('click', (e) => {
+            // Bouton d'ouverture du menu
+            const btn = e.target.closest('.action-btn');
+            if (btn) {
                 e.stopPropagation();
                 const menu = btn.nextElementSibling;
                 document.querySelectorAll('.action-dropdown.active').forEach(m => {
                     if (m !== menu) m.classList.remove('active');
                 });
-                menu.classList.toggle('active');
-            });
-        });
-
-        // Fermer le menu au clic dehors
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.action-menu')) {
-                document.querySelectorAll('.action-dropdown.active').forEach(m => {
-                    m.classList.remove('active');
-                });
+                if (menu) menu.classList.toggle('active');
+                return;
             }
-        });
 
-        // Actions des items du menu
-        document.querySelectorAll('.action-item').forEach(item => {
-            item.addEventListener('click', (e) => {
+            // Item du menu
+            const item = e.target.closest('.action-item');
+            if (item) {
                 e.stopPropagation();
                 const action = item.dataset.action;
                 const memberId = item.dataset.memberId;
+                const lotId = item.dataset.lotId;
 
-                if (action === 'payment') {
-                    this.showAddPaymentModal(memberId);
-                } else if (action === 'pdf') {
-                    this.generateMemberDetailedReport(memberId);
-                } else if (action === 'delete') {
-                    if (confirm('Êtes-vous sûr de vouloir supprimer ce membre ?')) {
-                        this.deleteMember(memberId);
+                if (memberId) {
+                    if (action === 'payment') {
+                        this.showAddPaymentModal(memberId);
+                    } else if (action === 'pdf') {
+                        if (typeof this.generateMemberDetailedReport === 'function') this.generateMemberDetailedReport(memberId);
+                        else if (typeof this.exportMemberToPDF === 'function') this.exportMemberToPDF(memberId);
+                    } else if (action === 'delete') {
+                        if (confirm('Êtes-vous sûr de vouloir supprimer ce membre ?')) {
+                            this.deleteMember(memberId);
+                        }
+                    }
+                } else if (lotId) {
+                    if (action === 'edit') {
+                        this.editLot(lotId);
+                    } else if (action === 'pdf') {
+                        this.exportLotToPDF(lotId);
+                    } else if (action === 'delete') {
+                        if (confirm('Êtes-vous sûr de vouloir supprimer ce lot ?')) {
+                            this.deleteLot(lotId);
+                        }
                     }
                 }
 
-                item.closest('.action-menu').querySelector('.action-dropdown').classList.remove('active');
-            });
+                const dropdown = item.closest('.action-menu') && item.closest('.action-menu').querySelector('.action-dropdown');
+                if (dropdown) dropdown.classList.remove('active');
+                return;
+            }
+
+            // Clic en dehors : fermer tous les dropdowns
+            if (!e.target.closest('.action-menu')) {
+                document.querySelectorAll('.action-dropdown.active').forEach(m => m.classList.remove('active'));
+            }
         });
     }
 
@@ -3200,38 +3218,8 @@ closeLotDetailsModal() {
     }
 
     setupLotsTableActions() {
-        // Gestion du menu déroulant
-        document.querySelectorAll('.action-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const menu = btn.nextElementSibling;
-                document.querySelectorAll('.action-dropdown.active').forEach(m => {
-                    if (m !== menu) m.classList.remove('active');
-                });
-                menu.classList.toggle('active');
-            });
-        });
-
-        // Actions des items du menu
-        document.querySelectorAll('.action-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const action = item.dataset.action;
-                const lotId = item.dataset.lotId;
-
-                if (action === 'edit') {
-                    this.editLot(lotId);
-                } else if (action === 'pdf') {
-                    this.exportLotToPDF(lotId);
-                } else if (action === 'delete') {
-                    if (confirm('Êtes-vous sûr de vouloir supprimer ce lot ?')) {
-                        this.deleteLot(lotId);
-                    }
-                }
-
-                item.closest('.action-menu').querySelector('.action-dropdown').classList.remove('active');
-            });
-        });
+        // Réutiliser l'attachement centralisé pour éviter duplication
+        this.setupTableActions();
     }
 
     renderLots() {
