@@ -3580,6 +3580,11 @@ async exportLotToPDF(lotId) {
                     </select>
                 </div>
 
+                <div class="form-group" id="monthCheckboxGroup" style="display: none;">
+                    <label class="form-label">Choisir les mois (cocher pour payer)</label>
+                    <div id="monthCheckboxes" class="month-checkbox-list"></div>
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">Date de Paiement</label>
                     <input type="date" class="form-input" id="paymentDate" required>
@@ -3615,6 +3620,8 @@ async exportLotToPDF(lotId) {
         const selectedMemberInfo = document.getElementById('selectedMemberInfo');
         const monthSelect = document.getElementById('paymentMonth');
         const monthSelectGroup = document.getElementById('monthSelectGroup');
+        const monthCheckboxGroup = document.getElementById('monthCheckboxGroup');
+        const monthCheckboxes = document.getElementById('monthCheckboxes');
         const amountInput = document.getElementById('paymentAmount');
         const suggestedAmount = document.getElementById('suggestedAmount');
         const remainingAmount = document.getElementById('remainingAmount');
@@ -3664,10 +3671,15 @@ async exportLotToPDF(lotId) {
                 }
             }
 
+            // If populateMonthsForMember returned a single auto month, keep old behavior
             if (autoMonth) {
                 selectedMonth = autoMonth;
                 this.calculateAndDisplayAmount(member, autoMonth);
                 submitBtn.disabled = false;
+            }
+            // ensure checkbox group visibility is synchronized (populateMonthsForMember handles display)
+            if (monthCheckboxGroup) {
+                monthCheckboxGroup.style.display = monthCheckboxes && monthCheckboxes.children.length ? 'block' : 'none';
             }
         };
 
@@ -3688,8 +3700,9 @@ async exportLotToPDF(lotId) {
                 if (selectedMember) {
                     applyMemberSelection(selectedMember);
                 } else {
-                    selectedMemberInfo.style.display = 'none';
-                    monthSelectGroup.style.display = 'none';
+                        selectedMemberInfo.style.display = 'none';
+                        monthSelectGroup.style.display = 'none';
+                        if (monthCheckboxGroup) monthCheckboxGroup.style.display = 'none';
                     amountInput.value = '';
                     if (suggestedAmount) suggestedAmount.style.display = 'none';
                     if (remainingAmount) remainingAmount.style.display = 'none';
@@ -3718,6 +3731,62 @@ async exportLotToPDF(lotId) {
             }
         });
 
+        // Delegate checkbox change events for multi-month selection
+        if (monthCheckboxes) {
+            monthCheckboxes.addEventListener('change', (ev) => {
+                const checkedEls = Array.from(monthCheckboxes.querySelectorAll('input[type="checkbox"]:checked'));
+                // enable submit if any month selected
+                submitBtn.disabled = checkedEls.length === 0 && !(selectedMonth);
+
+                // compute total remaining for selected months
+                let totalSelected = 0;
+                checkedEls.forEach(c => {
+                    const v = parseFloat(c.dataset.remaining || '0');
+                    if (!isNaN(v)) totalSelected += v;
+                });
+
+                // update amount input to reflect sum of selected months
+                if (amountInput && checkedEls.length > 0) {
+                    // clamp to member overall remaining
+                    const overallRemaining = selectedMember ? computeRemaining(selectedMember) : Infinity;
+                    const toSet = Math.min(totalSelected, overallRemaining);
+                    amountInput.value = toSet || '';
+                    if (suggestedAmount) {
+                        suggestedAmount.textContent = `Montant sélectionné: ${this.formatCurrency(toSet)}`;
+                        suggestedAmount.style.display = 'block';
+                    }
+                    if (remainingAmount && selectedMember) {
+                        remainingAmount.textContent = `Montant restant: ${this.formatCurrency(overallRemaining)}`;
+                        remainingAmount.style.display = 'block';
+                    }
+                } else {
+                    // no months selected — restore suggestion / clear selected hint
+                    if (selectedMember && amountInput) {
+                        const roundedMonthlyQuota = Math.round((selectedMember.monthlyQuota || 0) / 100) * 100;
+                        amountInput.value = roundedMonthlyQuota || '';
+                        if (suggestedAmount) {
+                            suggestedAmount.textContent = `Montant suggéré: ${this.formatCurrency(roundedMonthlyQuota || 0)}`;
+                            suggestedAmount.style.display = 'block';
+                        }
+                        if (remainingAmount) {
+                            const remaining = computeRemaining(selectedMember);
+                            remainingAmount.textContent = `Montant restant: ${this.formatCurrency(remaining)}`;
+                            remainingAmount.style.display = 'block';
+                        }
+                    } else {
+                        if (suggestedAmount) suggestedAmount.style.display = 'none';
+                        if (remainingAmount) remainingAmount.style.display = 'none';
+                    }
+                }
+
+                // if exactly one checkbox selected, show calculated amount for that month as before
+                if (checkedEls.length === 1 && selectedMember) {
+                    const mk = checkedEls[0].value;
+                    this.calculateAndDisplayAmount(selectedMember, mk);
+                }
+            });
+        }
+
         if (amountInput) {
             amountInput.addEventListener('input', () => {
                 if (!selectedMember) return;
@@ -3738,10 +3807,64 @@ async exportLotToPDF(lotId) {
 
         document.getElementById('paymentForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            if (selectedMember && selectedMonth) {
+            if (!selectedMember) {
+                this.showToast('Veuillez sélectionner un membre', 'error');
+                return;
+            }
+
+            const checked = monthCheckboxes ? Array.from(monthCheckboxes.querySelectorAll('input[type="checkbox"]:checked')).map(c => c.value) : [];
+
+            if (checked.length > 0) {
+                // Pay selected months individually (fill remaining for each month)
+                const paymentDate = document.getElementById('paymentDate').value;
+                const paymentsToAdd = [];
+                const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+                checked.forEach(mk => {
+                    const alreadyPaidForMonth = this.payments
+                        .filter(p => p.memberId === selectedMember.id && p.monthKey === mk)
+                        .reduce((sum, p) => sum + (p.amount || 0), 0);
+                    const needed = Math.max((selectedMember.monthlyQuota || 0) - alreadyPaidForMonth, 0);
+                    if (needed <= 0) return; // skip fully paid months
+
+                    const p = {
+                        id: this.generateId(),
+                        memberId: selectedMember.id,
+                        amount: needed,
+                        date: paymentDate,
+                        monthKey: mk,
+                        createdAt: new Date().toISOString()
+                    };
+                    paymentsToAdd.push(p);
+                });
+
+                if (paymentsToAdd.length === 0) {
+                    this.showToast('Aucun mois sélectionné à payer (tous sont peut-être déjà payés)', 'error');
+                    return;
+                }
+
+                const monthsCoveredKeys = paymentsToAdd.map(p => p.monthKey);
+                const monthsCoveredLabels = monthsCoveredKeys.map(mk => {
+                    const [y, m] = mk.split('-');
+                    return `${monthNames[parseInt(m, 10)]} ${y}`;
+                });
+
+                this.payments.push(...paymentsToAdd);
+                this.saveData();
+                this.closeModal();
+                this.updateUI();
+                this.updateStats();
+                this.showToast(`Paiement effectué pour: ${monthsCoveredLabels.join(', ')}`);
+                const totalPaid = paymentsToAdd.reduce((s,p) => s + (p.amount || 0), 0);
+                this.generatePaymentReceipt(paymentsToAdd[0], selectedMember, monthsCoveredLabels, totalPaid);
+                return;
+            }
+
+            // Fallback to single-month flow
+            if (selectedMonth) {
                 this.addPaymentWithReceipt(selectedMember, selectedMonth);
             } else {
-                this.showToast('Veuillez sélectionner un membre et un mois', 'error');
+                this.showToast('Veuillez sélectionner au moins un mois à payer', 'error');
             }
         });
     }
@@ -3811,6 +3934,8 @@ async exportLotToPDF(lotId) {
         console.log('Payments by month:', paymentsByMonth);
 
         monthSelect.innerHTML = '<option value="">Sélectionner un mois</option>';
+        const monthCheckboxesContainer = document.getElementById('monthCheckboxes');
+        if (monthCheckboxesContainer) monthCheckboxesContainer.innerHTML = '';
 
         const monthKeys = this.getMemberMonths(member);
         let optionsAdded = 0;
@@ -3830,6 +3955,48 @@ async exportLotToPDF(lotId) {
             if (!firstUnpaid && remainingForMonth > 0) {
                 firstUnpaid = monthKey;
             }
+            // build checkbox for multi-month selection
+            if (monthCheckboxesContainer) {
+                const cbId = `month_cb_${monthKey.replace(/[^a-zA-Z0-9]/g,'_')}`;
+                const card = document.createElement('div');
+                card.className = 'month-card';
+
+                const label = document.createElement('label');
+                label.className = 'month-checkbox-label';
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = monthKey;
+                cb.id = cbId;
+                cb.className = 'month-checkbox-input';
+                cb.dataset.remaining = remainingForMonth;
+                if (remainingForMonth <= 0) cb.disabled = true;
+
+                const customBox = document.createElement('span');
+                customBox.className = 'custom-checkbox';
+
+                const info = document.createElement('div');
+                info.className = 'month-info';
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'month-name';
+                nameDiv.textContent = `${monthNames[month]} ${year}`;
+                const amountDiv = document.createElement('div');
+                amountDiv.className = 'month-amount';
+                amountDiv.textContent = remainingForMonth > 0 ? this.formatCurrency(remainingForMonth) : 'Déjà payé';
+
+                info.appendChild(nameDiv);
+                info.appendChild(amountDiv);
+
+                // Structure: input (hidden) + custom box + info — CSS will style based on input:checked
+                label.appendChild(cb);
+                label.appendChild(customBox);
+                label.appendChild(info);
+
+                if (remainingForMonth <= 0) card.classList.add('disabled');
+
+                card.appendChild(label);
+                monthCheckboxesContainer.appendChild(card);
+            }
             console.log('Added month:', monthNames[month], year, 'remaining:', remainingForMonth);
         });
 
@@ -3845,6 +4012,10 @@ async exportLotToPDF(lotId) {
 
         console.log('Total options added:', optionsAdded, 'firstUnpaid:', firstUnpaid);
         monthSelectGroup.style.display = 'block';
+        if (monthCheckboxesContainer) {
+            const anyCheckbox = monthCheckboxesContainer.children && monthCheckboxesContainer.children.length;
+            document.getElementById('monthCheckboxGroup').style.display = anyCheckbox ? 'block' : 'none';
+        }
 
         return monthSelect.value || '';
     }
@@ -3996,10 +4167,11 @@ async exportLotToPDF(lotId) {
 
         this.showToast(`Paiement réparti sur: ${monthsCoveredLabels.join(', ')}`);
 
-        this.generatePaymentReceipt(paymentsToAdd[0], member, monthsCoveredLabels);
+        const totalPaid = paymentsToAdd.reduce((s,p) => s + (p.amount || 0), 0);
+        this.generatePaymentReceipt(paymentsToAdd[0], member, monthsCoveredLabels, totalPaid);
     }
 
-async generatePaymentReceipt(payment, member, monthsCovered) {
+async generatePaymentReceipt(payment, member, monthsCovered, totalAmount) {
     try {
 
         if (!member && payment && typeof payment === 'string') {
@@ -4027,7 +4199,8 @@ async generatePaymentReceipt(payment, member, monthsCovered) {
             return l ? l.name : 'Lot inconnu';
         }).join(', ') : (member.selectedLot ? (this.lots.find(l => l.id === member.selectedLot || l.name === member.selectedLot)?.name || member.selectedLot) : 'Aucun lot');
 
-        const amountReadable = this.formatCurrency(payment.amount || 0);
+        const displayAmount = (typeof totalAmount === 'number') ? totalAmount : (payment.amount || 0);
+        const amountReadable = this.formatCurrency(displayAmount || 0);
 
         const reportContainer = document.createElement('div');
         reportContainer.className = 'pdf-report-container receipt-vertical';
@@ -6443,75 +6616,24 @@ function exportMembersCsvForDashboard() {
     }
 }
 
-// Génération de reçu PDF pour un paiement
+// Génération de reçu PDF pour un paiement (délégué)
 function generatePaymentReceipt(paymentId) {
-    const payment = window.paymentManager.payments.find(p => p.id === paymentId);
-    if (!payment) return;
-    
-    const member = window.paymentManager.members.find(m => m.id === payment.memberId);
-    if (!member) return;
-    
-    const receiptHtml = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; border: 2px solid #181818;">
-            <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #6366F1; margin: 0;">CI Habitat</h1>
-                <p style="color: #5D6D7E; margin: 5px 0;">Reçu de Paiement</p>
-            </div>
-            
-            <div style="background: #F8F9FA; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                <p style="margin: 5px 0;"><strong>N° Reçu:</strong> ${payment.id}</p>
-                <p style="margin: 5px 0;"><strong>Date:</strong> ${new Date(payment.date).toLocaleDateString('fr-FR')}</p>
-            </div>
-            
-            <div style="margin-bottom: 20px;">
-                <h3 style="color: #2C3E50; border-bottom: 2px solid #6366F1; padding-bottom: 10px;">Informations</h3>
-                <p style="margin: 10px 0;"><strong>Membre:</strong> ${member.name}</p>
-                <p style="margin: 10px 0;"><strong>Téléphone:</strong> ${member.phone || 'N/A'}</p>
-                <p style="margin: 10px 0;"><strong>Période:</strong> ${payment.month}</p>
-            </div>
-            
-            <div style="background: #2C3E50; color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                <p style="margin: 0; font-size: 14px;">Montant Payé</p>
-                <h2 style="margin: 10px 0; font-size: 32px;">${formatCurrency(payment.amount)}</h2>
-            </div>
-            
-            ${payment.notes ? `
-                <div style="margin-top: 20px; padding: 15px; background: #FFF5E6; border-left: 4px solid #F39C12; border-radius: 4px;">
-                    <p style="margin: 0;"><strong>Remarques:</strong> ${payment.notes}</p>
-                </div>
-            ` : ''}
-            
-            <div style="margin-top: 40px; text-align: center; color: #5D6D7E; font-size: 12px;">
-                <p>Merci pour votre confiance</p>
-                <p>☎️ 01 618 837 90</p>
-                <p style="margin-top: 20px;">Document généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
-            </div>
-        </div>
-    `;
-    
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = receiptHtml;
-    tempDiv.style.position = 'absolute';
-    tempDiv.style.left = '-9999px';
-    document.body.appendChild(tempDiv);
-    
-    html2canvas(tempDiv.firstElementChild, {
-        scale: 2,
-        backgroundColor: '#ffffff'
-    }).then(canvas => {
-        document.body.removeChild(tempDiv);
-        
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgData = canvas.toDataURL('image/png');
-        const imgWidth = 190;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        
-        pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
-        pdf.save(`Recu_${member.name.replace(/\s+/g, '_')}_${payment.id}.pdf`);
-        
-        window.paymentManager.showNotification('Reçu PDF généré avec succès !', 'success');
-    });
+    try {
+        const pm = window.paymentManager;
+        if (!pm || typeof pm.generatePaymentReceipt !== 'function') return;
+        const payment = pm.payments.find(p => p.id === paymentId);
+        if (!payment) return;
+        const member = pm.members.find(m => m.id === payment.memberId) || null;
+
+        const monthsCovered = Array.isArray(payment.monthsCovered) && payment.monthsCovered.length
+            ? payment.monthsCovered
+            : (payment.monthKey ? [payment.monthKey] : []);
+
+        const totalAmount = payment.totalAmount || payment.amount || 0;
+        pm.generatePaymentReceipt(payment, member, monthsCovered, totalAmount);
+    } catch (err) {
+        console.error('Erreur en déléguant la génération du reçu :', err);
+    }
 }
 
 // Initialisation au chargement
@@ -6613,7 +6735,7 @@ let notificationsData = [];
 function initNotifications() {
     const notificationsBtn = document.getElementById('notificationsBtn');
     const notificationsDropdown = document.getElementById('notificationsDropdown');
-    const markAllRead = document.getElementById('markAllRead');
+    const markAllReadBtns = document.querySelectorAll('#markAllRead');
     
     console.log('Initialisation des notifications...');
     console.log('Bouton trouvé:', notificationsBtn);
@@ -6649,37 +6771,143 @@ function initNotifications() {
         }
     });
     
-    // Marquer tout comme lu
-    if (markAllRead) {
-        markAllRead.addEventListener('click', () => {
+    // Marquer tout comme lu (attacher à tous les boutons présents)
+    if (markAllReadBtns && markAllReadBtns.length) {
+        markAllReadBtns.forEach(btn => btn.addEventListener('click', () => {
             notificationsData.forEach(notif => notif.read = true);
             saveNotifications();
             updateNotifications();
-        });
+            if (window.paymentManager && window.paymentManager.currentTab === 'notifications') renderNotificationsPage();
+        }));
     }
     
     // Bouton "Voir toutes les notifications"
-    const viewAllBtn = document.getElementById('viewAllNotifications');
-    if (viewAllBtn) {
-        viewAllBtn.addEventListener('click', () => {
+    const viewAllBtns = document.querySelectorAll('#viewAllNotifications');
+    if (viewAllBtns && viewAllBtns.length) {
+        viewAllBtns.forEach(btn => btn.addEventListener('click', () => {
             // Fermer le dropdown
             notificationsDropdown.classList.remove('active');
             // Changer vers l'onglet notifications
             if (window.paymentManager) {
                 window.paymentManager.switchTab('notifications');
             }
-        });
+        }));
     }
     
     // Bouton "Tout effacer" dans l'onglet notifications
-    const clearAllBtn = document.getElementById('clearAllNotifications');
-    if (clearAllBtn) {
-        clearAllBtn.addEventListener('click', () => {
+    const clearAllBtns = document.querySelectorAll('#clearAllNotifications');
+    if (clearAllBtns && clearAllBtns.length) {
+        clearAllBtns.forEach(btn => btn.addEventListener('click', () => {
             if (confirm('Voulez-vous vraiment effacer toutes les notifications ?')) {
                 notificationsData = [];
                 saveNotifications();
                 updateNotifications();
                 renderNotificationsPage();
+            }
+        }));
+    }
+
+    // Effacer les notifications lues (attacher à tous les boutons trouvés)
+    const clearReadBtns = document.querySelectorAll('#clearReadNotifications');
+    if (clearReadBtns && clearReadBtns.length) {
+        clearReadBtns.forEach(btn => btn.addEventListener('click', () => {
+            if (!confirm('Effacer toutes les notifications lues ?')) return;
+            notificationsData = notificationsData.filter(n => !n.read);
+            saveNotifications();
+            updateNotifications();
+            if (window.paymentManager && window.paymentManager.currentTab === 'notifications') renderNotificationsPage();
+        }));
+    }
+
+    // Handler central pour actions rapides sur notifications
+    function handleNotificationAction(action, id, memberId) {
+        const notifIndex = notificationsData.findIndex(n => n.id == id);
+        const notif = notificationsData[notifIndex];
+        if (!notif && action !== 'delete') return;
+
+        if (action === 'toggle') {
+            notif.read = !notif.read;
+            saveNotifications();
+            updateNotifications();
+            if (window.paymentManager && window.paymentManager.currentTab === 'notifications') renderNotificationsPage();
+            return;
+        }
+
+        if (action === 'delete') {
+            notificationsData = notificationsData.filter(n => n.id != id);
+            saveNotifications();
+            updateNotifications();
+            if (window.paymentManager && window.paymentManager.currentTab === 'notifications') renderNotificationsPage();
+            return;
+        }
+
+        if (action === 'view-member' && memberId && window.paymentManager) {
+            const member = (window.paymentManager.members || []).find(m => String(m.id) === String(memberId));
+            window.paymentManager.switchTab('members');
+            setTimeout(() => {
+                try {
+                    // Si on a trouvé le membre, remplir la recherche et forcer le rendu
+                    const memberSearch = document.getElementById('memberSearch');
+                    if (member && memberSearch) {
+                        memberSearch.value = member.name || '';
+                        memberSearch.dispatchEvent(new Event('input', { bubbles: true }));
+                        if (typeof window.paymentManager.renderMembers === 'function') {
+                            window.paymentManager.renderMembers();
+                        }
+                    }
+
+                    // Sélectionner et scroller vers l'élément si présent
+                    if (typeof window.paymentManager.selectMember === 'function') {
+                        window.paymentManager.selectMember(memberId);
+                    }
+                    const el = document.querySelector(`[data-member-id="${memberId}"]`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } catch (err) {
+                    console.warn('Impossible de sélectionner le membre:', err);
+                }
+            }, 250);
+            return;
+        }
+    }
+
+    // Délégation d'événements pour actions rapides (dropdown miniature)
+    const notificationsList = document.getElementById('notificationsList');
+    if (notificationsList) {
+        notificationsList.addEventListener('click', (e) => {
+            const actionBtn = e.target.closest('.notif-action');
+            if (actionBtn) {
+                e.stopPropagation();
+                const action = actionBtn.dataset.action;
+                const id = actionBtn.dataset.id;
+                const memberId = actionBtn.dataset.memberId;
+                handleNotificationAction(action, id, memberId);
+                return;
+            }
+
+            const item = e.target.closest('.notification-item');
+            if (item && item.dataset && item.dataset.id) {
+                markNotificationRead(item.dataset.id);
+            }
+        });
+    }
+
+    // Délégation d'événements pour la page complète des notifications
+    const pageContainer = document.getElementById('notificationsPageContainer');
+    if (pageContainer) {
+        pageContainer.addEventListener('click', (e) => {
+            const actionBtn = e.target.closest('.notif-action');
+            if (actionBtn) {
+                e.stopPropagation();
+                const action = actionBtn.dataset.action;
+                const id = actionBtn.dataset.id;
+                const memberId = actionBtn.dataset.memberId;
+                handleNotificationAction(action, id, memberId);
+                return;
+            }
+
+            const item = e.target.closest('.notification-item');
+            if (item && item.dataset && item.dataset.id) {
+                markNotificationRead(item.dataset.id);
             }
         });
     }
@@ -6803,7 +7031,7 @@ function renderNotificationsList() {
         }
         
         return `
-            <div class="notification-item ${notif.read ? '' : 'unread'}" onclick="markNotificationRead('${notif.id}')">
+            <div class="notification-item ${notif.read ? '' : 'unread'}" data-id="${notif.id}">
                 <div class="notification-icon ${iconClass}">
                     ${iconHTML}
                 </div>
@@ -6817,6 +7045,13 @@ function renderNotificationsList() {
                         <i class="fas fa-clock"></i>
                         ${timeAgo}
                     </div>
+                </div>
+                <div class="notification-actions">
+                    <button class="notif-action" data-action="toggle" data-id="${notif.id}" title="${notif.read ? 'Marquer non lu' : 'Marquer lu'}">
+                        <i class="fas ${notif.read ? 'fa-undo' : 'fa-check'}"></i>
+                    </button>
+                    ${notif.data && notif.data.memberId ? `<button class="notif-action" data-action="view-member" data-id="${notif.id}" data-member-id="${notif.data.memberId}" title="Voir le membre"><i class="fas fa-user"></i></button>` : ''}
+                    <button class="notif-action" data-action="delete" data-id="${notif.id}" title="Supprimer"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
         `;
@@ -6988,7 +7223,7 @@ function renderNotificationsPage(filter = 'all') {
         }
         
         return `
-            <div class="notification-item ${notif.read ? '' : 'unread'}" onclick="markNotificationRead('${notif.id}')">
+            <div class="notification-item ${notif.read ? '' : 'unread'}" data-id="${notif.id}">
                 <div class="notification-icon ${iconClass}">
                     ${iconHTML}
                 </div>
@@ -7002,6 +7237,13 @@ function renderNotificationsPage(filter = 'all') {
                         <i class="fas fa-clock"></i>
                         ${timeAgo}
                     </div>
+                </div>
+                <div class="notification-actions">
+                    <button class="notif-action" data-action="toggle" data-id="${notif.id}" title="${notif.read ? 'Marquer non lu' : 'Marquer lu'}">
+                        <i class="fas ${notif.read ? 'fa-undo' : 'fa-check'}"></i>
+                    </button>
+                    ${notif.data && notif.data.memberId ? `<button class="notif-action" data-action="view-member" data-id="${notif.id}" data-member-id="${notif.data.memberId}" title="Voir le membre"><i class="fas fa-user"></i></button>` : ''}
+                    <button class="notif-action" data-action="delete" data-id="${notif.id}" title="Supprimer"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
         `;

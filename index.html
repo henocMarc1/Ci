@@ -134,6 +134,7 @@ firebase.auth().onAuthStateChanged(function(user) {
                     <button class="nav-tab pill-link" data-tab="members"><i class="fas fa-users"></i> Membres</button>
                     <button class="nav-tab pill-link" data-tab="lots"><i class="fas fa-home"></i> Gestion des Lots</button>
                     <button class="nav-tab pill-link" data-tab="payments"><i class="fas fa-credit-card"></i> Paiements</button>
+                    <button class="nav-tab pill-link" data-tab="notifications"><i class="fas fa-bell"></i> Notifications</button>
                     <button class="nav-tab pill-link" data-tab="statistics"><i class="fas fa-chart-line"></i> Statistiques</button>
                     
                 </div>
@@ -800,6 +801,37 @@ firebase.auth().onAuthStateChanged(function(user) {
                             </table>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Onglet Notifications -->
+            <div class="tab-content" id="notifications">
+                <div class="tab-header">
+                    <h2 class="tab-title">Notifications</h2>
+                    <div style="display:flex;gap:10px;align-items:center;">
+                        <div class="search-input-container" style="width:320px;">
+                            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                            <input type="text" id="notificationsSearch" class="search-input" placeholder="Rechercher dans les notifications...">
+                        </div>
+                        <button class="btn btn-secondary" id="clearReadNotifications">Effacer lus</button>
+                        <button class="btn btn-danger" id="clearAllNotifications">Tout effacer</button>
+                        <button class="btn btn-primary" id="markAllRead">Tout marquer lu</button>
+                    </div>
+                </div>
+
+                <div class="notifications-filters" style="margin:12px 0;display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="filter-btn active" data-filter="all">Toutes</button>
+                    <button class="filter-btn" data-filter="unread">Non lues</button>
+                    <button class="filter-btn" data-filter="alert">Alertes</button>
+                    <button class="filter-btn" data-filter="deadline">Échéances</button>
+                    <button class="filter-btn" data-filter="payment">Paiements</button>
+                </div>
+
+                <div id="notificationsPageContainer" class="notifications-page-container">
+                    <!-- Notifications injectées par JS -->
                 </div>
             </div>
 

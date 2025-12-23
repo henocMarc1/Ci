@@ -8131,3 +8131,114 @@ body.dark-mode .notifications-empty {
 .clients-lots-table .badge { background: var(--gradient-secondary); color: white; padding: 4px 12px; border-radius: 12px; font-size: var(--font-size-small); font-weight: 600; }
 .clients-lots-table .text-success { color: var(--success); font-weight: 600; }
 .clients-lots-table .text-danger { color: var(--danger); font-weight: 600; }
+
+/* Month checkbox card list */
+.month-checkbox-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.month-card {
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: var(--shadow-light);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.month-card.disabled { opacity: 0.6; }
+.month-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-medium); }
+
+.month-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    width: 100%;
+}
+.month-checkbox-input { display: none; }
+.custom-checkbox {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    flex: 0 0 22px;
+}
+.custom-checkbox::after {
+    content: '';
+    width: 10px;
+    height: 6px;
+    border-left: 2px solid transparent;
+    border-bottom: 2px solid transparent;
+    transform: rotate(-45deg);
+    opacity: 0;
+    transition: all 0.12s ease;
+}
+.month-checkbox-input:checked + .custom-checkbox {
+    background: var(--secondary);
+    border-color: var(--secondary);
+}
+.month-checkbox-input:checked + .custom-checkbox::after {
+    border-color: #fff;
+    opacity: 1;
+}
+.month-info { display: flex; flex-direction: column; }
+.month-name { font-weight: 600; color: var(--text-primary); }
+.month-amount { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+.month-card.disabled .month-amount { color: #999; }
+
+@media (max-width: 480px) {
+    .month-checkbox-list { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+}
+
+/* Notifications tab styles */
+.notifications-page-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+.notification-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #fff 0%, #fbfbfb 100%);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-light);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    cursor: pointer;
+}
+.notification-item.unread { border-left: 4px solid var(--accent); }
+.notification-item:hover { transform: translateY(-3px); box-shadow: var(--shadow-medium); }
+.notification-icon { width: 42px; height: 42px; border-radius: 10px; display:flex;align-items:center;justify-content:center; font-size:18px; color: white; }
+.notification-icon.info { background: linear-gradient(135deg, #3498DB, #5DADE2); }
+.notification-icon.payment { background: linear-gradient(135deg, #27AE60, #2ECC71); }
+.notification-icon.deadline { background: linear-gradient(135deg, #F39C12, #E67E22); }
+.notification-icon.alert { background: linear-gradient(135deg, #E74C3C, #EC7063); }
+.notification-content { flex: 1; min-width: 0; }
+.notification-title { font-weight: 700; color: var(--text-primary); display:flex;align-items:center;gap:8px; }
+.unread-dot { width:10px;height:10px;border-radius:50%;background:var(--danger);display:inline-block;margin-right:6px;box-shadow:0 1px 6px rgba(0,0,0,0.12);} 
+.notification-message { color:var(--text-secondary); font-size:14px; margin-top:6px; }
+.notification-time { color:var(--text-muted); font-size:12px; margin-top:8px; display:flex;align-items:center;gap:6px; }
+.notifications-filters { margin-bottom: 8px; }
+.filter-btn { padding:8px 12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-background); cursor:pointer; font-weight:600; }
+.filter-btn.active { background: linear-gradient(90deg, var(--pill-color), var(--pill-color-light)); color: white; border-color: transparent; box-shadow: 0 6px 18px rgba(24,24,24,0.12);} 
+.notifications-empty { text-align:center; padding:28px; color:var(--text-muted); }
+.notifications-empty i { font-size:36px; opacity:0.6; margin-bottom:8px; }
+
+.notification-actions { display:flex; gap:8px; align-items:center; margin-left:12px; }
+.notif-action { background: transparent; border: 1px solid transparent; padding:8px; border-radius:8px; cursor:pointer; color:var(--text-secondary); font-size:14px; }
+.notif-action:hover { background: var(--card-hover); border-color: rgba(0,0,0,0.06); }
+
+
+@media (min-width:900px) {
+    .notifications-page-container { grid-template-columns: repeat(2, 1fr); }
+}
+
