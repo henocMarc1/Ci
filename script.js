@@ -30,6 +30,15 @@ function safeSetItem(key, value) {
 let __cachedLogoDataUrl = null;
 async function getLogoDataUrl() {
     if (__cachedLogoDataUrl) return __cachedLogoDataUrl;
+    // If a pre-embedded Data URL was generated server-side (logo.data.js), use it first.
+    try {
+        if (window && window.EMBEDDED_LOGO_DATA_URL) {
+            __cachedLogoDataUrl = window.EMBEDDED_LOGO_DATA_URL;
+            return __cachedLogoDataUrl;
+        }
+    } catch (e) {
+        // ignore
+    }
     // 1) try network fetch (works when served via http(s))
     try {
         const resp = await fetch('logo.jpeg', { cache: 'no-cache' });
@@ -6960,6 +6969,7 @@ function initNotifications() {
 
     // Handler central pour actions rapides sur notifications
     function handleNotificationAction(action, id, memberId) {
+        console.log('handleNotificationAction called', { action, id, memberId, paymentManager: !!window.paymentManager });
         const notifIndex = notificationsData.findIndex(n => n.id == id);
         const notif = notificationsData[notifIndex];
         if (!notif && action !== 'delete') return;
@@ -7005,6 +7015,19 @@ function initNotifications() {
                     console.warn('Impossible de sélectionner le membre:', err);
                 }
             }, 250);
+            return;
+        }
+        
+        if (action === 'reminder' && memberId && window.paymentManager) {
+            const member = (window.paymentManager.members || []).find(m => String(m.id) === String(memberId));
+            if (!member) return;
+            // compute missing months (last 6 months) for the member
+            const missing = window.paymentManager.getMissingMonthsForMember(member, 6);
+            const monthList = missing.map(m => `${m.display}`).join(', ');
+            const defaultMsg = `Bonjour ${member.name},\n\nCeci est un rappel de paiement pour les mois suivants : ${monthList}.\n\nMerci de régulariser votre situation dès que possible.\n\nCordialement,\nCI Habitat`;
+            // allow user to edit message before generating
+            const userMsg = prompt('Modifier le message de rappel avant génération du PDF :', defaultMsg) || defaultMsg;
+            window.paymentManager.generateReminderPdf(member, missing, userMsg, id);
             return;
         }
     }
@@ -7185,11 +7208,12 @@ function renderNotificationsList() {
                         ${timeAgo}
                     </div>
                 </div>
-                <div class="notification-actions">
+                    <div class="notification-actions">
                     <button class="notif-action" data-action="toggle" data-id="${notif.id}" title="${notif.read ? 'Marquer non lu' : 'Marquer lu'}">
                         <i class="fas ${notif.read ? 'fa-undo' : 'fa-check'}"></i>
                     </button>
                     ${notif.data && notif.data.memberId ? `<button class="notif-action" data-action="view-member" data-id="${notif.id}" data-member-id="${notif.data.memberId}" title="Voir le membre"><i class="fas fa-user"></i></button>` : ''}
+                    ${notif.data && notif.data.memberId ? `<button class="notif-action" data-action="reminder" data-id="${notif.id}" data-member-id="${notif.data.memberId}" title="Générer rappel"><i class="fas fa-file-pdf"></i></button>` : ''}
                     <button class="notif-action" data-action="delete" data-id="${notif.id}" title="Supprimer"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
@@ -7382,6 +7406,7 @@ function renderNotificationsPage(filter = 'all') {
                         <i class="fas ${notif.read ? 'fa-undo' : 'fa-check'}"></i>
                     </button>
                     ${notif.data && notif.data.memberId ? `<button class="notif-action" data-action="view-member" data-id="${notif.id}" data-member-id="${notif.data.memberId}" title="Voir le membre"><i class="fas fa-user"></i></button>` : ''}
+                    ${notif.data && notif.data.memberId ? `<button class="notif-action" data-action="reminder" data-id="${notif.id}" data-member-id="${notif.data.memberId}" title="Générer rappel"><i class="fas fa-file-pdf"></i></button>` : ''}
                     <button class="notif-action" data-action="delete" data-id="${notif.id}" title="Supprimer"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
@@ -7498,5 +7523,147 @@ PaymentManager.prototype.maybeMigrateUnitPrice = function() {
             console.error('Erreur lors de la migration du prix unitaire/membres :', err);
         } finally {
             this._migrating = false;
+        }
+    }
+
+    // Retourne un tableau des mois manquants pour un membre (derniers `monthsBack` mois)
+    PaymentManager.prototype.getMissingMonthsForMember = function(member, monthsBack = 6) {
+        try {
+            const now = new Date();
+            const months = [];
+            const paidSet = new Set((this.payments || []).filter(p => String(p.memberId) === String(member.id)).map(p => {
+                const d = new Date(p.date);
+                return `${d.getFullYear()}-${d.getMonth()}`;
+            }));
+
+            for (let i = 0; i < monthsBack; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const key = `${d.getFullYear()}-${d.getMonth()}`;
+                if (!paidSet.has(key)) {
+                    const display = d.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+                    months.push({ key, year: d.getFullYear(), month: d.getMonth(), display });
+                }
+            }
+            return months.reverse(); // du plus ancien au plus récent
+        } catch (e) {
+            console.warn('Erreur getMissingMonthsForMember', e);
+            return [];
+        }
+    }
+
+    // Génère et télécharge un PDF de rappel stylé pour un membre
+    PaymentManager.prototype.generateReminderPdf = async function(member, missingMonths = [], message = '', notifId) {
+        try {
+            this.showNotification('Génération du PDF de rappel en cours...', 'info');
+
+            const logoData = await getLogoDataUrl();
+            const container = document.createElement('div');
+            container.className = 'pdf-reminder-container';
+            container.style.padding = '28px';
+            container.style.fontFamily = "'Inter', Arial, Helvetica, sans-serif";
+            container.style.fontSize = '22px';
+            container.style.maxWidth = '820px';
+            container.style.width = '100%';
+            const monthsHtml = missingMonths.length ? `<ul style="padding-left:20px;margin:0;font-size:16px;line-height:1.6">${missingMonths.map(m => `<li style=\"margin-bottom:6px;color:#111;font-weight:700\">${m.display}</li>`).join('')}</ul>` : '<p style="color:#6b7280;font-size:18px">Aucun mois spécifié</p>';
+            // Only use inline image if it's a data URL (to avoid CORS/taint issues when running from file://)
+            let logoHtml = '<div style="width:72px;height:72px;background:#eee;border-radius:8px"></div>';
+            try {
+                if (logoData && typeof logoData === 'string' && logoData.startsWith('data:')) {
+                    logoHtml = `<img src="${logoData}" alt="logo" style="height:72px;">`;
+                } else {
+                    console.log('Skipping external logo in PDF render to avoid CORS/taint (logoData):', logoData && typeof logoData === 'string' ? logoData.slice(0,80) : logoData);
+                }
+            } catch (e) {
+                console.warn('Error while preparing logoHtml', e);
+            }
+
+            // Card-like layout with watermark and nicer chips
+            const watermarkHtml = (logoData && typeof logoData === 'string' && logoData.startsWith('data:')) ? `<img src="${logoData}" style="position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);width:480px;opacity:0.06;filter:grayscale(1);pointer-events:none;" />` : '';
+            container.innerHTML = `
+                <div style="position:relative;">
+                    ${watermarkHtml}
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <div style="display:flex;align-items:center;gap:14px;">
+                            ${logoHtml}
+                            <div>
+                                <h2 style="margin:0;font-size:34px;color:#0b3d91;letter-spacing:0.5px">CI Habitat</h2>
+                                <div style="margin-top:6px;font-size:14px;color:#374151;font-weight:600">Tel: +225 0584103275</div>
+                                <div style="color:#6b7280;font-size:15px">L'immobilier Autrement • Côte d'Ivoire</div>
+                            </div>
+                        </div>
+                        <div style="text-align:right;color:#374151;font-size:13px;">Date: ${new Date().toLocaleDateString('fr-FR')}</div>
+                    </div>
+
+                    <div style="background:#ffffff;border-radius:12px;padding:22px;box-shadow:0 10px 30px rgba(16,24,40,0.08);">
+                        <div style="margin-bottom:10px;color:#374151;font-size:15px;font-weight:700">Destinataire</div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;">
+                            <div>
+                                <div style="font-weight:900;font-size:26px;color:#111">${member.name || 'N/A'}</div>
+                                <div style="color:#6b7280;font-size:15px">${member.email || ''}</div>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:18px;font-size:20px;color:#111;line-height:1.7">${message.replace(/\n/g, '<br>')}</div>
+
+                        <div style="margin-bottom:18px;">
+                            <div style="font-weight:800;color:#374151;margin-bottom:8px;font-size:16px">Mois(s) concernés</div>
+                            <div>${monthsHtml}</div>
+                        </div>
+
+                        <div style="margin-top:18px;color:#374151;font-size:15px">Cordialement,<br/><strong>CI Habitat</strong></div>
+
+                        <div style="display:flex;justify-content:center;margin-top:34px;">
+                            <div style="margin-top:18px;font-weight:900;font-size:22px;border-top:3px solid #111;padding-top:10px;width:180px;text-align:center;">CACHET</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(container);
+            await new Promise(r => setTimeout(r, 300));
+
+            // Ensure canvas matches container size; increase scale for better print quality
+            const canvas = await html2canvas(container, { 
+                scale: Math.max(2, (window.devicePixelRatio || 1)), 
+                useCORS: true, 
+                backgroundColor: '#ffffff',
+                width: container.offsetWidth,
+                height: container.offsetHeight
+            });
+            document.body.removeChild(container);
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgData = canvas.toDataURL('image/png');
+            // Fill full A4 width (210mm) and no horizontal margin
+            const imgWidth = 210;
+            const pageHeight = 297;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight + 0;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            const safeName = (member.name || 'rappel').replace(/[^a-z0-9_\-\.]/gi, '_');
+            const fileName = `Rappel_${safeName}_${Date.now()}.pdf`;
+            pdf.save(fileName);
+
+            this.showNotification('PDF de rappel généré et téléchargé.', 'success');
+
+            // Optionnel: marquer la notification comme traitée
+            if (notifId) {
+                const n = notificationsData.find(x => x.id == notifId);
+                if (n) { n.read = true; saveNotifications(); updateNotifications(); }
+            }
+        } catch (err) {
+            console.error('Erreur génération rappel PDF', err);
+            this.showNotification('Erreur lors de la génération du PDF de rappel', 'error');
         }
     }

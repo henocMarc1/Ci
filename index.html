@@ -17,7 +17,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-<link rel="stylesheet" href="styles.mobile.css">
+ 
 <!-- NOUVELLE LIGNE À AJOUTER -->
 <link rel="stylesheet" href="mobile-glass-nav.css">
 <!-- Configuration Firebase -->
@@ -818,7 +818,7 @@ firebase.auth().onAuthStateChanged(function(user) {
                         </div>
                         <button class="btn btn-secondary" id="clearReadNotifications">Effacer lus</button>
                         <button class="btn btn-danger" id="clearAllNotifications">Tout effacer</button>
-                        <button class="btn btn-primary" id="markAllRead">Tout marquer lu</button>
+                        <button class="btn btn-primary" id="markAllReadPage">Tout marquer lu</button>
                     </div>
                 </div>
 
@@ -835,37 +835,7 @@ firebase.auth().onAuthStateChanged(function(user) {
                 </div>
             </div>
 
-            <!-- Onglet Notifications -->
-            <div class="tab-content" id="notifications">
-                <div class="tab-header">
-                    <h2 class="tab-title"><i class="fas fa-bell"></i> Toutes les Notifications</h2>
-                    <button class="btn btn-secondary" id="clearAllNotifications">
-                        <i class="fas fa-trash"></i> Tout effacer
-                    </button>
-                </div>
-
-                <div class="notifications-filters">
-                    <button class="filter-btn active" data-filter="all">
-                        <i class="fas fa-list"></i> Toutes
-                    </button>
-                    <button class="filter-btn" data-filter="unread">
-                        <i class="fas fa-envelope"></i> Non lues
-                    </button>
-                    <button class="filter-btn" data-filter="payment">
-                        <i class="fas fa-money-bill-wave"></i> Paiements
-                    </button>
-                    <button class="filter-btn" data-filter="deadline">
-                        <i class="fas fa-calendar-times"></i> Échéances
-                    </button>
-                    <button class="filter-btn" data-filter="alert">
-                        <i class="fas fa-exclamation-triangle"></i> Alertes
-                    </button>
-                </div>
-
-                <div class="notifications-page-container" id="notificationsPageContainer">
-                    <!-- Les notifications seront affichées ici -->
-                </div>
-            </div>
+            
         </main>
 
 
@@ -927,19 +897,9 @@ firebase.auth().onAuthStateChanged(function(user) {
         </div>
     </div>
 
+    <script src="logo.data.js"></script>
     <script src="script.js"></script>
     <script>
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')) {
-    navigator.serviceWorker.register('service-worker.js', { scope: './' })
-        .then(reg => {
-            console.log('Service worker enregistré.');
-        })
-        .catch(err => {
-            console.error('Échec enregistrement SW :', err);
-        });
-} else {
-    console.log('Service Worker registration skipped: not running on http(s).');
-}
 </script>
 <script>
 let deferredPrompt;
